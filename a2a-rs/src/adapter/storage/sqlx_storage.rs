@@ -158,7 +158,13 @@ impl SqlxTaskStorage {
         sqlx::query(include_str!("../../../migrations/001_initial_schema.sql"))
             .execute(pool)
             .await
-            .map_err(|e| A2AError::DatabaseError(format!("Migration failed: {}", e)))?;
+            .map_err(|e| A2AError::DatabaseError(format!("Migration 001 failed: {}", e)))?;
+
+        // Run v0.3.0 migration for enhanced push notification configs
+        sqlx::query(include_str!("../../../migrations/002_v030_push_configs.sql"))
+            .execute(pool)
+            .await
+            .map_err(|e| A2AError::DatabaseError(format!("Migration 002 failed: {}", e)))?;
 
         Ok(())
     }
@@ -627,6 +633,278 @@ impl AsyncTaskManager for SqlxTaskStorage {
 
         Ok(updated_task)
     }
+
+    // ===== v0.3.0 Methods =====
+
+    async fn list_tasks_v3<'a>(
+        &self,
+        params: &'a crate::domain::ListTasksParams,
+    ) -> Result<crate::domain::ListTasksResult, A2AError> {
+        use crate::domain::ListTasksResult;
+
+        // Build WHERE clause conditions
+        let mut where_conditions = Vec::new();
+
+        // Filter by context_id
+        if params.context_id.is_some() {
+            where_conditions.push(format!("context_id = ?"));
+        }
+
+        // Filter by status
+        if params.status.is_some() {
+            where_conditions.push(format!("status_state = ?"));
+        }
+
+        // Filter by lastUpdatedAfter
+        let timestamp_str = if let Some(last_updated_after) = params.last_updated_after {
+            // Convert milliseconds to SQLite timestamp
+            let timestamp = chrono::DateTime::from_timestamp_millis(last_updated_after)
+                .unwrap_or(chrono::Utc::now());
+            where_conditions.push(format!("updated_at > ?"));
+            Some(timestamp.format("%Y-%m-%d %H:%M:%S").to_string())
+        } else {
+            None
+        };
+
+        // Build WHERE clause
+        let where_clause = if where_conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", where_conditions.join(" AND "))
+        };
+
+        // First, get total count with same filters
+        let count_query = format!("SELECT COUNT(*) as count FROM tasks{}", where_clause);
+        let mut count_q = sqlx::query(&count_query);
+
+        // Bind parameters for count query
+        if let Some(ref context_id) = params.context_id {
+            count_q = count_q.bind(context_id);
+        }
+        if let Some(ref status) = params.status {
+            let state_str = match status {
+                crate::domain::TaskState::Submitted => "submitted",
+                crate::domain::TaskState::Working => "working",
+                crate::domain::TaskState::InputRequired => "input-required",
+                crate::domain::TaskState::Completed => "completed",
+                crate::domain::TaskState::Canceled => "canceled",
+                crate::domain::TaskState::Failed => "failed",
+                crate::domain::TaskState::Rejected => "rejected",
+                crate::domain::TaskState::AuthRequired => "auth-required",
+                crate::domain::TaskState::Unknown => "unknown",
+            };
+            count_q = count_q.bind(state_str);
+        }
+        if let Some(ref ts) = timestamp_str {
+            count_q = count_q.bind(ts);
+        }
+
+        let count_row = count_q
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| A2AError::DatabaseError(format!("Failed to count tasks: {}", e)))?;
+
+        let total_size: i32 = count_row.try_get("count")
+            .map_err(|e| A2AError::DatabaseError(format!("Failed to get count: {}", e)))?;
+
+        // Handle pagination
+        let page_size = params.page_size.unwrap_or(50).clamp(1, 100);
+        let offset = if let Some(ref token) = params.page_token {
+            token.parse::<i32>().unwrap_or(0)
+        } else {
+            0
+        };
+
+        // Build main query with LIMIT and OFFSET
+        let main_query = format!(
+            "SELECT * FROM tasks{} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            where_clause
+        );
+
+        let mut main_q = sqlx::query(&main_query);
+
+        // Bind parameters for main query
+        if let Some(ref context_id) = params.context_id {
+            main_q = main_q.bind(context_id);
+        }
+        if let Some(ref status) = params.status {
+            let state_str = match status {
+                crate::domain::TaskState::Submitted => "submitted",
+                crate::domain::TaskState::Working => "working",
+                crate::domain::TaskState::InputRequired => "input-required",
+                crate::domain::TaskState::Completed => "completed",
+                crate::domain::TaskState::Canceled => "canceled",
+                crate::domain::TaskState::Failed => "failed",
+                crate::domain::TaskState::Rejected => "rejected",
+                crate::domain::TaskState::AuthRequired => "auth-required",
+                crate::domain::TaskState::Unknown => "unknown",
+            };
+            main_q = main_q.bind(state_str);
+        }
+        if let Some(ref ts) = timestamp_str {
+            main_q = main_q.bind(ts);
+        }
+
+        // Bind LIMIT and OFFSET
+        main_q = main_q.bind(page_size).bind(offset);
+
+        let rows = main_q
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| A2AError::DatabaseError(format!("Failed to list tasks: {}", e)))?;
+
+        // Convert rows to tasks
+        let mut tasks: Vec<Task> = rows
+            .iter()
+            .filter_map(|row| Self::row_to_task(row).ok())
+            .collect();
+
+        // Load history for each task if requested
+        let history_length = params.history_length.unwrap_or(0);
+        for task in &mut tasks {
+            if history_length > 0 {
+                let history = self.load_task_history(&task.id, Some(history_length as u32)).await?;
+                task.history = if history.is_empty() {
+                    None
+                } else {
+                    Some(history)
+                };
+            } else {
+                task.history = None;
+            }
+
+            // Remove artifacts if not requested
+            if !params.include_artifacts.unwrap_or(false) {
+                task.artifacts = None;
+            }
+        }
+
+        // Generate next page token
+        let has_more = offset + page_size < total_size;
+        let next_page_token = if has_more {
+            (offset + page_size).to_string()
+        } else {
+            String::new()
+        };
+
+        Ok(ListTasksResult {
+            tasks,
+            total_size,
+            page_size,
+            next_page_token,
+        })
+    }
+
+    async fn get_push_notification_config<'a>(
+        &self,
+        params: &'a crate::domain::GetTaskPushNotificationConfigParams,
+    ) -> Result<crate::domain::TaskPushNotificationConfig, A2AError> {
+        // Query the database for the specific config
+        // Note: push_notification_config_id filtering requires migration 002 to be applied
+        let config_id = params.push_notification_config_id.as_ref()
+            .ok_or_else(|| A2AError::TaskNotFound("push_notification_config_id is required".to_string()))?;
+
+        let row = sqlx::query(
+            "SELECT id, task_id, url, token, authentication FROM push_notification_configs WHERE task_id = ? AND id = ?"
+        )
+        .bind(&params.id)
+        .bind(config_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| A2AError::DatabaseError(format!("Failed to get push config: {}", e)))?;
+
+        if let Some(row) = row {
+            let id: String = row.try_get("id").map_err(|e| {
+                A2AError::DatabaseError(format!("Failed to get config id: {}", e))
+            })?;
+            let url: String = row.try_get("url").map_err(|e| {
+                A2AError::DatabaseError(format!("Failed to get url: {}", e))
+            })?;
+            let token: Option<String> = row.try_get("token").ok();
+            let auth_json: Option<String> = row.try_get("authentication").ok();
+
+            let authentication = if let Some(auth_str) = auth_json {
+                serde_json::from_str(&auth_str).ok()
+            } else {
+                None
+            };
+
+            Ok(crate::domain::TaskPushNotificationConfig {
+                task_id: params.id.clone(),
+                push_notification_config: crate::domain::PushNotificationConfig {
+                    id: Some(id),
+                    url,
+                    token,
+                    authentication,
+                },
+            })
+        } else {
+            Err(A2AError::TaskNotFound(format!(
+                "Push notification config not found for task {} with id {}",
+                params.id, config_id
+            )))
+        }
+    }
+
+    async fn list_push_notification_configs<'a>(
+        &self,
+        params: &'a crate::domain::ListTaskPushNotificationConfigParams,
+    ) -> Result<Vec<crate::domain::TaskPushNotificationConfig>, A2AError> {
+        // Query all configs for the task
+        let rows = sqlx::query(
+            "SELECT id, task_id, url, token, authentication FROM push_notification_configs WHERE task_id = ?"
+        )
+        .bind(&params.id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| A2AError::DatabaseError(format!("Failed to list push configs: {}", e)))?;
+
+        let configs: Vec<crate::domain::TaskPushNotificationConfig> = rows
+            .iter()
+            .filter_map(|row| {
+                let id: String = row.try_get("id").ok()?;
+                let url: String = row.try_get("url").ok()?;
+                let token: Option<String> = row.try_get("token").ok().flatten();
+                let auth_json: Option<String> = row.try_get("authentication").ok().flatten();
+
+                let authentication = if let Some(auth_str) = auth_json {
+                    serde_json::from_str(&auth_str).ok()
+                } else {
+                    None
+                };
+
+                Some(crate::domain::TaskPushNotificationConfig {
+                    task_id: params.id.clone(),
+                    push_notification_config: crate::domain::PushNotificationConfig {
+                        id: Some(id),
+                        url,
+                        token,
+                        authentication,
+                    },
+                })
+            })
+            .collect();
+
+        Ok(configs)
+    }
+
+    async fn delete_push_notification_config<'a>(
+        &self,
+        params: &'a crate::domain::DeleteTaskPushNotificationConfigParams,
+    ) -> Result<(), A2AError> {
+        // Delete the specific config
+        let _result = sqlx::query(
+            "DELETE FROM push_notification_configs WHERE task_id = ? AND id = ?"
+        )
+        .bind(&params.id)
+        .bind(&params.push_notification_config_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| A2AError::DatabaseError(format!("Failed to delete push config: {}", e)))?;
+
+        // Idempotent - don't error if already deleted (v0.3.0 spec behavior)
+        Ok(())
+    }
 }
 
 #[cfg(feature = "sqlx-storage")]
@@ -636,12 +914,23 @@ impl AsyncNotificationManager for SqlxTaskStorage {
         &self,
         config: &'a TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
-        // Store in database
+        // Generate ID if not provided
+        let config_id = config.push_notification_config.id.clone()
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+
+        // Serialize authentication if present
+        let auth_json = config.push_notification_config.authentication.as_ref()
+            .map(|auth| serde_json::to_string(auth).unwrap_or_default());
+
+        // Store in database (using new schema with id, token, authentication)
         sqlx::query(
-            "INSERT OR REPLACE INTO push_notification_configs (task_id, webhook_url) VALUES (?, ?)",
+            "INSERT OR REPLACE INTO push_notification_configs (id, task_id, url, token, authentication) VALUES (?, ?, ?, ?, ?)",
         )
+        .bind(&config_id)
         .bind(&config.task_id)
         .bind(&config.push_notification_config.url)
+        .bind(&config.push_notification_config.token)
+        .bind(auth_json)
         .execute(&self.pool)
         .await
         .map_err(|e| {
@@ -653,16 +942,19 @@ impl AsyncNotificationManager for SqlxTaskStorage {
             .register(&config.task_id, config.push_notification_config.clone())
             .await?;
 
-        Ok(config.clone())
+        // Return config with ID set
+        let mut result_config = config.clone();
+        result_config.push_notification_config.id = Some(config_id);
+        Ok(result_config)
     }
 
     async fn get_task_notification<'a>(
         &self,
         task_id: &'a str,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
-        // Get from database
+        // Get from database (get first config for backwards compatibility)
         let row =
-            sqlx::query("SELECT webhook_url FROM push_notification_configs WHERE task_id = ?")
+            sqlx::query("SELECT id, url, token, authentication FROM push_notification_configs WHERE task_id = ? LIMIT 1")
                 .bind(task_id)
                 .fetch_optional(&self.pool)
                 .await
@@ -674,21 +966,35 @@ impl AsyncNotificationManager for SqlxTaskStorage {
                 })?;
 
         if let Some(row) = row {
-            let webhook_url: String = row.try_get("webhook_url").map_err(|e| {
-                A2AError::DatabaseError(format!("Failed to get webhook_url: {}", e))
+            let id: String = row.try_get("id").map_err(|e| {
+                A2AError::DatabaseError(format!("Failed to get id: {}", e))
             })?;
+            let url: String = row.try_get("url").map_err(|e| {
+                A2AError::DatabaseError(format!("Failed to get url: {}", e))
+            })?;
+            let token: Option<String> = row.try_get("token").ok();
+            let auth_json: Option<String> = row.try_get("authentication").ok();
+
+            let authentication = if let Some(auth_str) = auth_json {
+                serde_json::from_str(&auth_str).ok()
+            } else {
+                None
+            };
 
             Ok(TaskPushNotificationConfig {
                 task_id: task_id.to_string(),
                 push_notification_config: crate::domain::PushNotificationConfig {
-                    id: None,
-                    url: webhook_url,
-                    token: None,
-                    authentication: None,
+                    id: Some(id),
+                    url,
+                    token,
+                    authentication,
                 },
             })
         } else {
-            Err(A2AError::PushNotificationNotSupported)
+            Err(A2AError::TaskNotFound(format!(
+                "No push notification config found for task {}",
+                task_id
+            )))
         }
     }
 
@@ -727,10 +1033,11 @@ impl AsyncStreamingHandler for SqlxTaskStorage {
             task_subscribers.status.push(subscriber);
         } // Lock is dropped here
 
-        // Get the current status (with full history) to send as an initial update
-        let task = self.get_task(task_id, None).await?;
-        self.broadcast_status_update(task_id, task.status, false)
-            .await?;
+        // Try to get the current status to send as an initial update
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            let _ = self.broadcast_status_update(task_id, task.status, false).await;
+        }
 
         Ok(format!("status-{}-{}", task_id, uuid::Uuid::new_v4()))
     }
@@ -752,11 +1059,12 @@ impl AsyncStreamingHandler for SqlxTaskStorage {
         } // Lock is dropped here
 
         // If there are existing artifacts, broadcast them
-        let task = self.get_task(task_id, None).await?;
-        if let Some(artifacts) = task.artifacts {
-            for artifact in artifacts {
-                self.broadcast_artifact_update(task_id, artifact, None, false)
-                    .await?;
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            if let Some(artifacts) = task.artifacts {
+                for artifact in artifacts {
+                    let _ = self.broadcast_artifact_update(task_id, artifact, None, false).await;
+                }
             }
         }
 

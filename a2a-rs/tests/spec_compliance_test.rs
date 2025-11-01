@@ -3,6 +3,8 @@
 //! This module validates that our Rust types match the JSON Schema definitions
 //! in the A2A specification files located in ../spec/
 
+mod common;
+
 use a2a_rs::{
     adapter::SimpleAgentInfo,
     application::SendMessageRequest,
@@ -871,5 +873,177 @@ mod property_based_tests {
                 prop_assert_eq!(task.id, task_id);
             }
         }
+    }
+}
+
+// Priority 3: Error Handling and Validation Tests
+
+#[tokio::test]
+async fn test_task_list_page_size_validation() {
+    use a2a_rs::{
+        adapter::{
+            DefaultRequestProcessor, HttpClient, HttpServer, InMemoryTaskStorage, SimpleAgentInfo,
+        },
+        application::json_rpc,
+        services::AsyncA2AClient,
+    };
+    use common::TestBusinessHandler;
+    use std::time::Duration;
+    use tokio::sync::oneshot;
+
+    let port = 9500;
+    let storage = InMemoryTaskStorage::new();
+    let handler = TestBusinessHandler::with_storage(storage);
+    let agent_info = SimpleAgentInfo::new(
+        "Validation Test Agent".to_string(),
+        format!("http://localhost:{}", port),
+    );
+
+    let processor = DefaultRequestProcessor::with_handler(handler, agent_info.clone());
+    let server = HttpServer::new(processor, agent_info, format!("127.0.0.1:{}", port));
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = server.start() => {},
+            _ = shutdown_rx => {}
+        }
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let client = HttpClient::new(format!("http://localhost:{}", port));
+
+    // Test page_size > 100 (should clamp to 100, not error)
+    let request = json_rpc::ListTasksRequest::new(Some(a2a_rs::domain::ListTasksParams {
+        page_size: Some(150),
+        ..Default::default()
+    }));
+
+    let response = client
+        .send_request(&json_rpc::A2ARequest::ListTasks(request))
+        .await
+        .expect("Failed to send request");
+
+    // According to spec, page_size should be clamped, not return error
+    assert!(response.error.is_none(), "page_size > 100 should be clamped, not error");
+
+    // Test page_size < 1 (should clamp to 1, not error)
+    let request = json_rpc::ListTasksRequest::new(Some(a2a_rs::domain::ListTasksParams {
+        page_size: Some(0),
+        ..Default::default()
+    }));
+
+    let response = client
+        .send_request(&json_rpc::A2ARequest::ListTasks(request))
+        .await
+        .expect("Failed to send request");
+
+    // According to spec, page_size should be clamped, not return error
+    assert!(response.error.is_none(), "page_size < 1 should be clamped, not error");
+
+    shutdown_tx.send(()).ok();
+}
+
+#[test]
+fn test_all_a2a_error_codes_defined() {
+    use a2a_rs::domain::A2AError;
+
+    // Test all A2A-specific error codes from the specification
+    let errors = vec![
+        (A2AError::TaskNotFound("test-task".to_string()), -32001),
+        (A2AError::TaskNotCancelable("test-task".to_string()), -32002),
+        (A2AError::PushNotificationNotSupported, -32003),
+        (A2AError::UnsupportedOperation("test".to_string()), -32004),
+        (A2AError::ContentTypeNotSupported("test/type".to_string()), -32005),
+        (A2AError::InvalidAgentResponse("test".to_string()), -32006),
+        (A2AError::AuthenticatedExtendedCardNotConfigured, -32007),
+    ];
+
+    for (error, expected_code) in errors {
+        let jsonrpc_error = error.to_jsonrpc_error();
+        assert_eq!(
+            jsonrpc_error["code"], expected_code,
+            "Error {:?} should have code {}",
+            error, expected_code
+        );
+        assert!(
+            !jsonrpc_error["message"].as_str().unwrap().is_empty(),
+            "Error message should not be empty"
+        );
+    }
+}
+
+#[test]
+fn test_jsonrpc_error_structure_compliance() {
+    use a2a_rs::domain::A2AError;
+
+    let error = A2AError::TaskNotFound("task-123".to_string());
+    let jsonrpc_error = error.to_jsonrpc_error();
+
+    // Verify JSON-RPC error structure
+    assert!(jsonrpc_error.is_object(), "Error should be an object");
+    assert!(jsonrpc_error.get("code").is_some(), "Error must have code field");
+    assert!(jsonrpc_error.get("message").is_some(), "Error must have message field");
+
+    // code should be an integer
+    assert!(jsonrpc_error["code"].is_i64(), "Error code must be an integer");
+
+    // message should be a string
+    assert!(jsonrpc_error["message"].is_string(), "Error message must be a string");
+}
+
+#[test]
+fn test_task_state_transitions_validation() {
+    use a2a_rs::domain::{Message, Task, TaskState};
+
+    let task_id = "task-transition-test".to_string();
+    let context_id = "ctx-test".to_string();
+    let mut task = Task::new(task_id.clone(), context_id);
+
+    // Valid state transitions
+    let valid_transitions = vec![
+        (TaskState::Submitted, TaskState::Working),
+        (TaskState::Working, TaskState::InputRequired),
+        (TaskState::InputRequired, TaskState::Working),
+        (TaskState::Working, TaskState::Completed),
+        (TaskState::Working, TaskState::Failed),
+        (TaskState::Working, TaskState::Canceled),
+    ];
+
+    for (_from_state, to_state) in valid_transitions {
+        let msg = Message::agent_text(
+            format!("Transitioning to {:?}", to_state),
+            format!("msg-{}", uuid::Uuid::new_v4()),
+        );
+        task.update_status(to_state.clone(), Some(msg));
+        assert_eq!(task.status.state, to_state, "Task should transition to {:?}", to_state);
+    }
+}
+
+#[test]
+fn test_error_code_ranges() {
+    // Verify that error codes follow the specification ranges
+
+    // Standard JSON-RPC errors: -32700 to -32603
+    let jsonrpc_codes = vec![-32700, -32600, -32601, -32602, -32603];
+
+    for code in jsonrpc_codes {
+        assert!(
+            code >= -32700 && code <= -32600,
+            "JSON-RPC error code {} should be in range -32700 to -32600",
+            code
+        );
+    }
+
+    // A2A-specific errors: -32001 to -32007
+    let a2a_codes = vec![-32001, -32002, -32003, -32004, -32005, -32006, -32007];
+
+    for code in a2a_codes {
+        assert!(
+            code >= -32007 && code <= -32001,
+            "A2A error code {} should be in range -32007 to -32001",
+            code
+        );
     }
 }

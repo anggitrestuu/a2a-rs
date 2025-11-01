@@ -20,8 +20,8 @@ use crate::{
         JSONRPCResponse,
     },
     domain::{
-        A2AError, Message, Task, TaskIdParams, TaskPushNotificationConfig, TaskQueryParams,
-        TaskSendParams,
+        A2AError, ListTasksParams, ListTasksResult, Message, Task, TaskIdParams,
+        TaskPushNotificationConfig, TaskQueryParams, TaskSendParams,
     },
     services::client::{AsyncA2AClient, StreamItem},
 };
@@ -294,6 +294,142 @@ impl AsyncA2AClient for HttpClient {
                     Err(A2AError::Internal("Empty response".to_string()))
                 }
             }
+        }
+    }
+
+    /// List tasks with filtering and pagination (v0.3.0)
+    #[cfg_attr(feature = "tracing", instrument(skip(self, params)))]
+    async fn list_tasks<'a>(
+        &self,
+        params: &'a ListTasksParams,
+    ) -> Result<ListTasksResult, A2AError> {
+        let request = json_rpc::ListTasksRequest::new(Some(params.clone()));
+        let response = self.send_request(&A2ARequest::ListTasks(request)).await?;
+
+        match response.result {
+            Some(value) => {
+                let result: ListTasksResult = serde_json::from_value(value)?;
+                Ok(result)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    /// List all push notification configs for a task (v0.3.0)
+    #[cfg_attr(feature = "tracing", instrument(skip(self)))]
+    async fn list_push_notification_configs<'a>(
+        &self,
+        task_id: &'a str,
+    ) -> Result<Vec<TaskPushNotificationConfig>, A2AError> {
+        use crate::domain::ListTaskPushNotificationConfigParams;
+
+        let request = json_rpc::ListTaskPushNotificationConfigRequest::new(
+            ListTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::ListTaskPushNotificationConfigs(request))
+            .await?;
+
+        match response.result {
+            Some(value) => {
+                let configs: Vec<TaskPushNotificationConfig> = serde_json::from_value(value)?;
+                Ok(configs)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    /// Get a specific push notification config by ID (v0.3.0)
+    #[cfg_attr(feature = "tracing", instrument(skip(self)))]
+    async fn get_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<TaskPushNotificationConfig, A2AError> {
+        use crate::domain::GetTaskPushNotificationConfigParams;
+
+        let request = json_rpc::GetTaskPushNotificationConfigRequest::new(
+            GetTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                push_notification_config_id: Some(config_id.to_string()),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::GetTaskPushNotificationConfig(request))
+            .await?;
+
+        match response.result {
+            Some(value) => {
+                let config: TaskPushNotificationConfig = serde_json::from_value(value)?;
+                Ok(config)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    /// Delete a specific push notification config (v0.3.0)
+    #[cfg_attr(feature = "tracing", instrument(skip(self)))]
+    async fn delete_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<(), A2AError> {
+        use crate::domain::DeleteTaskPushNotificationConfigParams;
+
+        let request = json_rpc::DeleteTaskPushNotificationConfigRequest::new(
+            DeleteTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                push_notification_config_id: config_id.to_string(),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::DeleteTaskPushNotificationConfig(request))
+            .await?;
+
+        // For delete operations, both Some(Null) and None are success if there's no error
+        if let Some(error) = response.error {
+            Err(A2AError::JsonRpc {
+                code: error.code,
+                message: error.message,
+                data: error.data,
+            })
+        } else {
+            Ok(())
         }
     }
 

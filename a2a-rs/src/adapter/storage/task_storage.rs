@@ -124,24 +124,69 @@ impl InMemoryTaskStorage {
             task_id: task_id.to_string(),
             context_id: "default".to_string(), // TODO: get actual context_id
             kind: "status-update".to_string(),
-            status,
+            status: status.clone(),
             final_,
             metadata: None,
         };
 
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            task_id = %task_id,
+            state = ?status.state,
+            "📡 Broadcasting status update to subscribers"
+        );
+
         // Get all subscribers for this task and notify them
-        {
+        let subscriber_count = {
             let subscribers_guard = self.subscribers.lock().await;
 
             if let Some(task_subscribers) = subscribers_guard.get(task_id) {
+                let count = task_subscribers.status.len();
+                #[cfg(feature = "tracing")]
+                tracing::info!(
+                    task_id = %task_id,
+                    subscriber_count = count,
+                    state = ?status.state,
+                    "📡 Notifying WebSocket subscribers of status update"
+                );
+
                 // Clone the subscribers so we don't hold the lock during notification
-                for subscriber in task_subscribers.status.iter() {
+                for (i, subscriber) in task_subscribers.status.iter().enumerate() {
                     if let Err(e) = subscriber.on_update(event.clone()).await {
+                        #[cfg(feature = "tracing")]
+                        tracing::error!(
+                            task_id = %task_id,
+                            subscriber_index = i,
+                            error = %e,
+                            "❌ Failed to notify subscriber"
+                        );
                         eprintln!("Failed to notify subscriber: {}", e);
+                    } else {
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!(
+                            task_id = %task_id,
+                            subscriber_index = i,
+                            "✅ Successfully notified subscriber"
+                        );
                     }
                 }
+                count
+            } else {
+                #[cfg(feature = "tracing")]
+                tracing::warn!(
+                    task_id = %task_id,
+                    "⚠️  No WebSocket subscribers found for task"
+                );
+                0
             }
         }; // Lock is dropped here
+
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            task_id = %task_id,
+            notified_count = subscriber_count,
+            "📡 Finished broadcasting to WebSocket subscribers"
+        );
 
         // Send push notification if configured
         if let Err(e) = self
@@ -458,10 +503,23 @@ impl AsyncNotificationManager for InMemoryTaskStorage {
         &self,
         config: &'a TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %config.task_id,
+            url = %config.push_notification_config.url,
+            "✅ Registering push notification config for task"
+        );
+
         // Register with the push notification registry
         self.push_notification_registry
             .register(&config.task_id, config.push_notification_config.clone())
             .await?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %config.task_id,
+            "✅ Push notification config registered successfully"
+        );
 
         Ok(config.clone())
     }
@@ -494,6 +552,12 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         task_id: &'a str,
         subscriber: Box<dyn Subscriber<TaskStatusUpdateEvent> + Send + Sync>,
     ) -> Result<String, A2AError> {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %task_id,
+            "✅ Adding WebSocket subscriber for status updates"
+        );
+
         // Add the subscriber
         {
             let mut subscribers_guard = self.subscribers.lock().await;
@@ -503,12 +567,20 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
                 .or_insert_with(TaskSubscribers::new);
 
             task_subscribers.status.push(subscriber);
+
+            #[cfg(feature = "tracing")]
+            tracing::info!(
+                task_id = %task_id,
+                subscriber_count = task_subscribers.status.len(),
+                "✅ WebSocket subscriber added successfully"
+            );
         } // Lock is dropped here
 
-        // Get the current status (with full history) to send as an initial update
-        let task = self.get_task(task_id, None).await?;
-        self.broadcast_status_update(task_id, task.status, false)
-            .await?;
+        // Try to get the current status to send as an initial update
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            let _ = self.broadcast_status_update(task_id, task.status, false).await;
+        }
 
         Ok(format!("status-{}-{}", task_id, uuid::Uuid::new_v4()))
     }
@@ -530,11 +602,12 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         } // Lock is dropped here
 
         // If there are existing artifacts, broadcast them
-        let task = self.get_task(task_id, None).await?;
-        if let Some(artifacts) = task.artifacts {
-            for artifact in artifacts {
-                self.broadcast_artifact_update(task_id, artifact, None, false)
-                    .await?;
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            if let Some(artifacts) = task.artifacts {
+                for artifact in artifacts {
+                    let _ = self.broadcast_artifact_update(task_id, artifact, None, false).await;
+                }
             }
         }
 

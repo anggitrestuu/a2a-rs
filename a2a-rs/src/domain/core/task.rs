@@ -347,14 +347,21 @@ impl Task {
         if let Some(msg) = message {
             if let Some(history) = &mut self.history {
                 #[cfg(feature = "tracing")]
-                tracing::debug!(
-                    "Adding message to existing history (size: {})",
-                    history.len()
+                tracing::info!(
+                    "Adding message to history: role={:?}, message_id={}, current_size={}, new_size={}",
+                    msg.role,
+                    msg.message_id,
+                    history.len(),
+                    history.len() + 1
                 );
                 history.push(msg);
             } else {
                 #[cfg(feature = "tracing")]
-                tracing::debug!("Creating new history with message");
+                tracing::info!(
+                    "Creating new history with message: role={:?}, message_id={}",
+                    msg.role,
+                    msg.message_id
+                );
                 self.history = Some(vec![msg]);
             }
         }

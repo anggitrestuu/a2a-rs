@@ -85,6 +85,12 @@ impl SimpleAgentInfo {
         self
     }
 
+    /// Enable authenticated extended card support (v0.3.0)
+    pub fn with_authenticated_extended_card(mut self) -> Self {
+        self.card.supports_authenticated_extended_card = Some(true);
+        self
+    }
+
     /// Set the authentication schemes
     pub fn with_authentication(self, _schemes: Vec<String>) -> Self {
         // TODO: Implement SecurityScheme integration
@@ -254,5 +260,16 @@ impl AgentInfoProvider for SimpleAgentInfo {
     // Override the default implementation for better performance
     async fn has_skill(&self, id: &str) -> Result<bool, A2AError> {
         Ok(self.card.skills.iter().any(|skill| skill.id == id))
+    }
+
+    // Override to provide authenticated extended card when configured (v0.3.0)
+    async fn get_authenticated_extended_card(&self) -> Result<AgentCard, A2AError> {
+        if self.card.supports_authenticated_extended_card.unwrap_or(false) {
+            // Return the same card for now
+            // In a real implementation, this might include additional authenticated-only fields
+            Ok(self.card.clone())
+        } else {
+            Err(A2AError::AuthenticatedExtendedCardNotConfigured)
+        }
     }
 }

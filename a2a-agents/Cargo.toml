@@ -8,6 +8,7 @@ license = "MIT"
 
 [dependencies]
 a2a-rs = { path = "../a2a-rs", features = ["full"] }
+a2a-client = { path = "../a2a-client" }
 
 # Core dependencies
 serde = { version = "1.0", features = ["derive"] }
@@ -16,6 +17,7 @@ chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1.0"
 uuid = { version = "1.4", features = ["v4", "serde"] }
 bon = "2.3"
+dotenvy = "0.15.7"
 
 # Async foundation
 tokio = { version = "1.32", features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }
@@ -32,11 +34,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 lazy_static = "1.4"  # Used for static request ID storage in message_handler
 regex = "1.10"  # Used for text parsing in improved handler
 
-# Optional AI integration (for future use)
-# reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false, optional = true }
+# AI integration (OpenAI-compatible API)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+# Frontend dependencies
+axum = { version = "0.7", features = ["multipart"] }
+askama = "0.12"
+askama_axum = "0.4"
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+base64 = "0.22"
+futures = "0.3"
+anyhow = "1.0"
 
 [features]
-default = ["reimbursement-agent"]
+default = ["reimbursement-agent", "sqlx"]
 reimbursement-agent = []
 sqlx = ["a2a-rs/sqlx-storage"]
 auth = ["a2a-rs/auth"]
@@ -48,6 +59,11 @@ auth = ["a2a-rs/auth"]
 [[bin]]
 name = "reimbursement_server"
 path = "bin/reimbursement_server.rs"
+required-features = ["reimbursement-agent"]
+
+[[bin]]
+name = "reimbursement_frontend"
+path = "bin/frontend.rs"
 required-features = ["reimbursement-agent"]
 
 [[example]]
