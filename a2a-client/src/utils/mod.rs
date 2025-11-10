@@ -2,4 +2,4 @@
 
 pub mod formatters;
 
-pub use formatters::{format_task_state, format_message_content};
+pub use formatters::{format_message_content, format_task_state};

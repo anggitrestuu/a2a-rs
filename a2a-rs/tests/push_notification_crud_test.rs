@@ -10,7 +10,9 @@
 mod common;
 
 use a2a_rs::{
-    adapter::{DefaultRequestProcessor, HttpClient, HttpServer, InMemoryTaskStorage, SimpleAgentInfo},
+    adapter::{
+        DefaultRequestProcessor, HttpClient, HttpServer, InMemoryTaskStorage, SimpleAgentInfo,
+    },
     domain::{PushNotificationConfig, TaskPushNotificationConfig},
     port::{AsyncNotificationManager, AsyncTaskManager},
     services::AsyncA2AClient,
@@ -60,12 +62,17 @@ async fn test_list_push_notification_configs_empty() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task WITHOUT any push notification config
-    storage.create_task("task_no_configs", "test_context").await.unwrap();
+    storage
+        .create_task("task_no_configs", "test_context")
+        .await
+        .unwrap();
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // List configs for task with no configs
-    let result = client.list_push_notification_configs("task_no_configs").await;
+    let result = client
+        .list_push_notification_configs("task_no_configs")
+        .await;
 
     shutdown.send(()).ok();
 
@@ -81,7 +88,10 @@ async fn test_set_and_list_push_notification_config() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task
-    storage.create_task("task_with_config", "test_context").await.unwrap();
+    storage
+        .create_task("task_with_config", "test_context")
+        .await
+        .unwrap();
 
     // Set a push notification config using the storage API
     let config = TaskPushNotificationConfig {
@@ -99,12 +109,18 @@ async fn test_set_and_list_push_notification_config() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // List configs
-    let result = client.list_push_notification_configs("task_with_config").await;
+    let result = client
+        .list_push_notification_configs("task_with_config")
+        .await;
 
     shutdown.send(()).ok();
 
     // Verify successful response
-    assert!(result.is_ok(), "List configs should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "List configs should succeed: {:?}",
+        result.err()
+    );
     let configs = result.unwrap();
 
     // Should have 1 config (current implementation supports only 1 per task)
@@ -113,9 +129,18 @@ async fn test_set_and_list_push_notification_config() {
     // Verify config details
     let returned_config = &configs[0];
     assert_eq!(returned_config.task_id, "task_with_config");
-    assert_eq!(returned_config.push_notification_config.id, Some("config_1".to_string()));
-    assert_eq!(returned_config.push_notification_config.url, "https://example.com/webhook1");
-    assert_eq!(returned_config.push_notification_config.token, Some("secret_token_123".to_string()));
+    assert_eq!(
+        returned_config.push_notification_config.id,
+        Some("config_1".to_string())
+    );
+    assert_eq!(
+        returned_config.push_notification_config.url,
+        "https://example.com/webhook1"
+    );
+    assert_eq!(
+        returned_config.push_notification_config.token,
+        Some("secret_token_123".to_string())
+    );
 }
 
 #[tokio::test]
@@ -124,7 +149,10 @@ async fn test_get_push_notification_config() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task
-    storage.create_task("task_get_config", "test_context").await.unwrap();
+    storage
+        .create_task("task_get_config", "test_context")
+        .await
+        .unwrap();
 
     // Set a push notification config
     let config = TaskPushNotificationConfig {
@@ -142,19 +170,34 @@ async fn test_get_push_notification_config() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Get the config (note: pushNotificationConfigId is optional, current impl ignores it)
-    let result = client.get_push_notification_config("task_get_config", "config_abc").await;
+    let result = client
+        .get_push_notification_config("task_get_config", "config_abc")
+        .await;
 
     shutdown.send(()).ok();
 
     // Verify successful response
-    assert!(result.is_ok(), "Get config should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Get config should succeed: {:?}",
+        result.err()
+    );
     let returned_config = result.unwrap();
 
     // Verify config details
     assert_eq!(returned_config.task_id, "task_get_config");
-    assert_eq!(returned_config.push_notification_config.id, Some("config_abc".to_string()));
-    assert_eq!(returned_config.push_notification_config.url, "https://example.com/notifications");
-    assert_eq!(returned_config.push_notification_config.token, Some("bearer_token_xyz".to_string()));
+    assert_eq!(
+        returned_config.push_notification_config.id,
+        Some("config_abc".to_string())
+    );
+    assert_eq!(
+        returned_config.push_notification_config.url,
+        "https://example.com/notifications"
+    );
+    assert_eq!(
+        returned_config.push_notification_config.token,
+        Some("bearer_token_xyz".to_string())
+    );
 }
 
 #[tokio::test]
@@ -163,12 +206,17 @@ async fn test_get_push_notification_config_not_found() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task WITHOUT a config
-    storage.create_task("task_no_config", "test_context").await.unwrap();
+    storage
+        .create_task("task_no_config", "test_context")
+        .await
+        .unwrap();
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Try to get non-existent config
-    let result = client.get_push_notification_config("task_no_config", "nonexistent").await;
+    let result = client
+        .get_push_notification_config("task_no_config", "nonexistent")
+        .await;
 
     shutdown.send(()).ok();
 
@@ -182,7 +230,10 @@ async fn test_delete_push_notification_config() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task
-    storage.create_task("task_delete", "test_context").await.unwrap();
+    storage
+        .create_task("task_delete", "test_context")
+        .await
+        .unwrap();
 
     // Set a push notification config
     let config = TaskPushNotificationConfig {
@@ -200,21 +251,41 @@ async fn test_delete_push_notification_config() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Verify config exists
-    let configs_before = client.list_push_notification_configs("task_delete").await.unwrap();
-    assert_eq!(configs_before.len(), 1, "Should have 1 config before deletion");
+    let configs_before = client
+        .list_push_notification_configs("task_delete")
+        .await
+        .unwrap();
+    assert_eq!(
+        configs_before.len(),
+        1,
+        "Should have 1 config before deletion"
+    );
 
     // Delete the config
-    let result = client.delete_push_notification_config("task_delete", "config_to_delete").await;
+    let result = client
+        .delete_push_notification_config("task_delete", "config_to_delete")
+        .await;
 
     // Verify successful deletion
-    assert!(result.is_ok(), "Delete config should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Delete config should succeed: {:?}",
+        result.err()
+    );
 
     // Verify config is gone
-    let configs_after = client.list_push_notification_configs("task_delete").await.unwrap();
+    let configs_after = client
+        .list_push_notification_configs("task_delete")
+        .await
+        .unwrap();
 
     shutdown.send(()).ok();
 
-    assert_eq!(configs_after.len(), 0, "Should have 0 configs after deletion");
+    assert_eq!(
+        configs_after.len(),
+        0,
+        "Should have 0 configs after deletion"
+    );
 }
 
 #[tokio::test]
@@ -223,17 +294,25 @@ async fn test_delete_nonexistent_push_config() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task without config
-    storage.create_task("task_empty", "test_context").await.unwrap();
+    storage
+        .create_task("task_empty", "test_context")
+        .await
+        .unwrap();
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Try to delete non-existent config (DELETE is idempotent, so this should succeed)
-    let result = client.delete_push_notification_config("task_empty", "nonexistent").await;
+    let result = client
+        .delete_push_notification_config("task_empty", "nonexistent")
+        .await;
 
     shutdown.send(()).ok();
 
     // Idempotent delete: succeeds even if config doesn't exist
-    assert!(result.is_ok(), "Delete is idempotent, should succeed even for nonexistent config");
+    assert!(
+        result.is_ok(),
+        "Delete is idempotent, should succeed even for nonexistent config"
+    );
 }
 
 #[tokio::test]
@@ -244,12 +323,17 @@ async fn test_delete_push_config_from_nonexistent_task() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Try to delete config from non-existent task (DELETE is idempotent, so this should succeed)
-    let result = client.delete_push_notification_config("nonexistent_task", "config_1").await;
+    let result = client
+        .delete_push_notification_config("nonexistent_task", "config_1")
+        .await;
 
     shutdown.send(()).ok();
 
     // Idempotent delete: succeeds even if task doesn't exist
-    assert!(result.is_ok(), "Delete is idempotent, should succeed even for nonexistent task");
+    assert!(
+        result.is_ok(),
+        "Delete is idempotent, should succeed even for nonexistent task"
+    );
 }
 
 #[tokio::test]
@@ -258,7 +342,10 @@ async fn test_push_notification_config_with_authentication() {
     let (shutdown, storage) = setup_server(port).await;
 
     // Create a task
-    storage.create_task("task_with_auth", "test_context").await.unwrap();
+    storage
+        .create_task("task_with_auth", "test_context")
+        .await
+        .unwrap();
 
     // Set a push notification config with authentication
     let config = TaskPushNotificationConfig {
@@ -279,7 +366,9 @@ async fn test_push_notification_config_with_authentication() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // List and verify authentication is preserved
-    let result = client.list_push_notification_configs("task_with_auth").await;
+    let result = client
+        .list_push_notification_configs("task_with_auth")
+        .await;
 
     shutdown.send(()).ok();
 
@@ -288,9 +377,16 @@ async fn test_push_notification_config_with_authentication() {
     assert_eq!(configs.len(), 1);
 
     let returned_config = &configs[0];
-    assert!(returned_config.push_notification_config.authentication.is_some());
+    assert!(returned_config
+        .push_notification_config
+        .authentication
+        .is_some());
 
-    let auth = returned_config.push_notification_config.authentication.as_ref().unwrap();
+    let auth = returned_config
+        .push_notification_config
+        .authentication
+        .as_ref()
+        .unwrap();
     assert_eq!(auth.schemes, vec!["Bearer".to_string()]);
     assert_eq!(auth.credentials, Some("secret_credentials".to_string()));
 }
@@ -303,12 +399,17 @@ async fn test_list_configs_for_nonexistent_task() {
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
     // Try to list configs for non-existent task
-    let result = client.list_push_notification_configs("nonexistent_task").await;
+    let result = client
+        .list_push_notification_configs("nonexistent_task")
+        .await;
 
     shutdown.send(()).ok();
 
     // Should succeed with empty array (spec doesn't require task to exist for listing)
-    assert!(result.is_ok(), "List should succeed even for nonexistent task");
+    assert!(
+        result.is_ok(),
+        "List should succeed even for nonexistent task"
+    );
     let configs = result.unwrap();
     assert_eq!(configs.len(), 0, "Should return empty array");
 }

@@ -53,11 +53,13 @@ impl MessageView {
             .iter()
             .filter_map(|part| match part {
                 MessagePart::Text { text, .. } => Some(text.clone()),
-                MessagePart::File { file, .. } => {
-                    Some(format!("[File: {}]", file.name.as_ref().unwrap_or(&"unnamed".to_string())))
-                }
+                MessagePart::File { file, .. } => Some(format!(
+                    "[File: {}]",
+                    file.name.as_ref().unwrap_or(&"unnamed".to_string())
+                )),
                 MessagePart::Data { data, .. } => {
-                    let name = data.get("name")
+                    let name = data
+                        .get("name")
                         .and_then(|v| v.as_str())
                         .unwrap_or("unnamed");
                     Some(format!("[Data: {}]", name))
@@ -86,32 +88,34 @@ impl MessageView {
             .join("\n");
 
         // Try to parse as JSON for better display
-        let display_content = if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
-            if let Some(obj) = json_value.as_object() {
-                match obj.get("type").and_then(|v| v.as_str()) {
-                    Some("form") => {
-                        obj.get("instructions")
+        let display_content =
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(obj) = json_value.as_object() {
+                    match obj.get("type").and_then(|v| v.as_str()) {
+                        Some("form") => obj
+                            .get("instructions")
                             .and_then(|v| v.as_str())
                             .unwrap_or("Please fill out the form.")
-                            .to_string()
+                            .to_string(),
+                        Some("result") => {
+                            let message = obj
+                                .get("message")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Request processed.");
+                            let status = obj
+                                .get("status")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown");
+                            format!("{}\n\nStatus: {}", message, status)
+                        }
+                        _ => serde_json::to_string_pretty(&json_value).unwrap_or(content.clone()),
                     }
-                    Some("result") => {
-                        let message = obj.get("message")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("Request processed.");
-                        let status = obj.get("status")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown");
-                        format!("{}\n\nStatus: {}", message, status)
-                    }
-                    _ => serde_json::to_string_pretty(&json_value).unwrap_or(content.clone()),
+                } else {
+                    content.clone()
                 }
             } else {
                 content.clone()
-            }
-        } else {
-            content.clone()
-        };
+            };
 
         Self {
             id: msg.message_id,

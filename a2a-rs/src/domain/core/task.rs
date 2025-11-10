@@ -150,7 +150,10 @@ pub struct TaskQueryParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageSendConfiguration {
     /// Output formats the client can handle (v0.3.0: changed to optional)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "acceptedOutputModes")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "acceptedOutputModes"
+    )]
     pub accepted_output_modes: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "historyLength")]
     pub history_length: Option<u32>,
@@ -275,7 +278,10 @@ pub struct GetTaskPushNotificationConfigParams {
     /// Task ID
     pub id: String,
     /// Specific config ID to retrieve (optional)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "pushNotificationConfigId")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "pushNotificationConfigId"
+    )]
     pub push_notification_config_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Map<String, Value>>,

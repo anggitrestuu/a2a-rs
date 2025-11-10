@@ -1,6 +1,6 @@
 //! Formatting utilities for displaying A2A types
 
-use a2a_rs::domain::{TaskState, Part};
+use a2a_rs::domain::{Part, TaskState};
 
 /// Format a task state for display
 pub fn format_task_state(state: &TaskState) -> String {
@@ -24,11 +24,13 @@ pub fn format_message_content(parts: &[Part]) -> String {
         .iter()
         .filter_map(|part| match part {
             Part::Text { text, .. } => Some(text.clone()),
-            Part::File { file, .. } => {
-                Some(format!("[File: {}]", file.name.as_ref().unwrap_or(&"unnamed".to_string())))
-            }
+            Part::File { file, .. } => Some(format!(
+                "[File: {}]",
+                file.name.as_ref().unwrap_or(&"unnamed".to_string())
+            )),
             Part::Data { data, .. } => {
-                let name = data.get("name")
+                let name = data
+                    .get("name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unnamed");
                 Some(format!("[Data: {}]", name))

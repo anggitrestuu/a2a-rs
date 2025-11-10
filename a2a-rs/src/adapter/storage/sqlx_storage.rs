@@ -161,10 +161,12 @@ impl SqlxTaskStorage {
             .map_err(|e| A2AError::DatabaseError(format!("Migration 001 failed: {}", e)))?;
 
         // Run v0.3.0 migration for enhanced push notification configs
-        sqlx::query(include_str!("../../../migrations/002_v030_push_configs.sql"))
-            .execute(pool)
-            .await
-            .map_err(|e| A2AError::DatabaseError(format!("Migration 002 failed: {}", e)))?;
+        sqlx::query(include_str!(
+            "../../../migrations/002_v030_push_configs.sql"
+        ))
+        .execute(pool)
+        .await
+        .map_err(|e| A2AError::DatabaseError(format!("Migration 002 failed: {}", e)))?;
 
         Ok(())
     }
@@ -704,7 +706,8 @@ impl AsyncTaskManager for SqlxTaskStorage {
             .await
             .map_err(|e| A2AError::DatabaseError(format!("Failed to count tasks: {}", e)))?;
 
-        let total_size: i32 = count_row.try_get("count")
+        let total_size: i32 = count_row
+            .try_get("count")
             .map_err(|e| A2AError::DatabaseError(format!("Failed to get count: {}", e)))?;
 
         // Handle pagination
@@ -763,7 +766,9 @@ impl AsyncTaskManager for SqlxTaskStorage {
         let history_length = params.history_length.unwrap_or(0);
         for task in &mut tasks {
             if history_length > 0 {
-                let history = self.load_task_history(&task.id, Some(history_length as u32)).await?;
+                let history = self
+                    .load_task_history(&task.id, Some(history_length as u32))
+                    .await?;
                 task.history = if history.is_empty() {
                     None
                 } else {
@@ -801,8 +806,9 @@ impl AsyncTaskManager for SqlxTaskStorage {
     ) -> Result<crate::domain::TaskPushNotificationConfig, A2AError> {
         // Query the database for the specific config
         // Note: push_notification_config_id filtering requires migration 002 to be applied
-        let config_id = params.push_notification_config_id.as_ref()
-            .ok_or_else(|| A2AError::TaskNotFound("push_notification_config_id is required".to_string()))?;
+        let config_id = params.push_notification_config_id.as_ref().ok_or_else(|| {
+            A2AError::TaskNotFound("push_notification_config_id is required".to_string())
+        })?;
 
         let row = sqlx::query(
             "SELECT id, task_id, url, token, authentication FROM push_notification_configs WHERE task_id = ? AND id = ?"
@@ -814,12 +820,12 @@ impl AsyncTaskManager for SqlxTaskStorage {
         .map_err(|e| A2AError::DatabaseError(format!("Failed to get push config: {}", e)))?;
 
         if let Some(row) = row {
-            let id: String = row.try_get("id").map_err(|e| {
-                A2AError::DatabaseError(format!("Failed to get config id: {}", e))
-            })?;
-            let url: String = row.try_get("url").map_err(|e| {
-                A2AError::DatabaseError(format!("Failed to get url: {}", e))
-            })?;
+            let id: String = row
+                .try_get("id")
+                .map_err(|e| A2AError::DatabaseError(format!("Failed to get config id: {}", e)))?;
+            let url: String = row
+                .try_get("url")
+                .map_err(|e| A2AError::DatabaseError(format!("Failed to get url: {}", e)))?;
             let token: Option<String> = row.try_get("token").ok();
             let auth_json: Option<String> = row.try_get("authentication").ok();
 
@@ -893,14 +899,15 @@ impl AsyncTaskManager for SqlxTaskStorage {
         params: &'a crate::domain::DeleteTaskPushNotificationConfigParams,
     ) -> Result<(), A2AError> {
         // Delete the specific config
-        let _result = sqlx::query(
-            "DELETE FROM push_notification_configs WHERE task_id = ? AND id = ?"
-        )
-        .bind(&params.id)
-        .bind(&params.push_notification_config_id)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| A2AError::DatabaseError(format!("Failed to delete push config: {}", e)))?;
+        let _result =
+            sqlx::query("DELETE FROM push_notification_configs WHERE task_id = ? AND id = ?")
+                .bind(&params.id)
+                .bind(&params.push_notification_config_id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| {
+                    A2AError::DatabaseError(format!("Failed to delete push config: {}", e))
+                })?;
 
         // Idempotent - don't error if already deleted (v0.3.0 spec behavior)
         Ok(())
@@ -915,11 +922,17 @@ impl AsyncNotificationManager for SqlxTaskStorage {
         config: &'a TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
         // Generate ID if not provided
-        let config_id = config.push_notification_config.id.clone()
+        let config_id = config
+            .push_notification_config
+            .id
+            .clone()
             .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
         // Serialize authentication if present
-        let auth_json = config.push_notification_config.authentication.as_ref()
+        let auth_json = config
+            .push_notification_config
+            .authentication
+            .as_ref()
             .map(|auth| serde_json::to_string(auth).unwrap_or_default());
 
         // Store in database (using new schema with id, token, authentication)
@@ -966,12 +979,12 @@ impl AsyncNotificationManager for SqlxTaskStorage {
                 })?;
 
         if let Some(row) = row {
-            let id: String = row.try_get("id").map_err(|e| {
-                A2AError::DatabaseError(format!("Failed to get id: {}", e))
-            })?;
-            let url: String = row.try_get("url").map_err(|e| {
-                A2AError::DatabaseError(format!("Failed to get url: {}", e))
-            })?;
+            let id: String = row
+                .try_get("id")
+                .map_err(|e| A2AError::DatabaseError(format!("Failed to get id: {}", e)))?;
+            let url: String = row
+                .try_get("url")
+                .map_err(|e| A2AError::DatabaseError(format!("Failed to get url: {}", e)))?;
             let token: Option<String> = row.try_get("token").ok();
             let auth_json: Option<String> = row.try_get("authentication").ok();
 
@@ -1036,7 +1049,9 @@ impl AsyncStreamingHandler for SqlxTaskStorage {
         // Try to get the current status to send as an initial update
         // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
         if let Ok(task) = self.get_task(task_id, None).await {
-            let _ = self.broadcast_status_update(task_id, task.status, false).await;
+            let _ = self
+                .broadcast_status_update(task_id, task.status, false)
+                .await;
         }
 
         Ok(format!("status-{}-{}", task_id, uuid::Uuid::new_v4()))
@@ -1063,7 +1078,9 @@ impl AsyncStreamingHandler for SqlxTaskStorage {
         if let Ok(task) = self.get_task(task_id, None).await {
             if let Some(artifacts) = task.artifacts {
                 for artifact in artifacts {
-                    let _ = self.broadcast_artifact_update(task_id, artifact, None, false).await;
+                    let _ = self
+                        .broadcast_artifact_update(task_id, artifact, None, false)
+                        .await;
                 }
             }
         }

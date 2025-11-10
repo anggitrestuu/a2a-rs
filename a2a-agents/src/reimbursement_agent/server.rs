@@ -1,6 +1,6 @@
 use a2a_rs::adapter::{
-    BearerTokenAuthenticator, DefaultRequestProcessor, HttpServer, InMemoryTaskStorage,
-    HttpPushNotificationSender, SimpleAgentInfo, WebSocketServer,
+    BearerTokenAuthenticator, DefaultRequestProcessor, HttpPushNotificationSender, HttpServer,
+    InMemoryTaskStorage, SimpleAgentInfo, WebSocketServer,
 };
 use a2a_rs::port::{AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager};
 
@@ -51,7 +51,10 @@ impl ReimbursementServer {
         _max_connections: u32,
         enable_logging: bool,
     ) -> Result<SqlxTaskStorage, Box<dyn std::error::Error>> {
-        tracing::info!("Using SQLx storage with URL: {} and push notification support", url);
+        tracing::info!(
+            "Using SQLx storage with URL: {} and push notification support",
+            url
+        );
         if enable_logging {
             tracing::info!("SQL query logging enabled");
         }
@@ -256,7 +259,13 @@ impl ReimbursementServer {
     /// Start WebSocket server with specific storage
     async fn start_websocket_server<S>(&self, storage: S) -> Result<(), Box<dyn std::error::Error>>
     where
-        S: AsyncTaskManager + AsyncNotificationManager + AsyncStreamingHandler + Clone + Send + Sync + 'static,
+        S: AsyncTaskManager
+            + AsyncNotificationManager
+            + AsyncStreamingHandler
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     {
         // Create message handler with storage for history management
         let message_handler = ReimbursementHandler::new(storage.clone());
@@ -387,7 +396,9 @@ impl ReimbursementServer {
 
         match &self.config.storage {
             StorageConfig::InMemory => {
-                println!("💾 Storage: In-memory (non-persistent) - SHARED between HTTP and WebSocket");
+                println!(
+                    "💾 Storage: In-memory (non-persistent) - SHARED between HTTP and WebSocket"
+                );
                 let storage = self.create_in_memory_storage();
                 self.start_both_with_storage(storage).await
             }
@@ -397,8 +408,13 @@ impl ReimbursementServer {
                 max_connections,
                 enable_logging,
             } => {
-                println!("💾 Storage: SQLx ({}) - SHARED between HTTP and WebSocket", url);
-                let storage = self.create_sqlx_storage(url, *max_connections, *enable_logging).await?;
+                println!(
+                    "💾 Storage: SQLx ({}) - SHARED between HTTP and WebSocket",
+                    url
+                );
+                let storage = self
+                    .create_sqlx_storage(url, *max_connections, *enable_logging)
+                    .await?;
                 self.start_both_with_storage(storage).await
             }
             #[cfg(not(feature = "sqlx"))]
@@ -411,7 +427,13 @@ impl ReimbursementServer {
     /// Start both servers with shared storage
     async fn start_both_with_storage<S>(&self, storage: S) -> Result<(), Box<dyn std::error::Error>>
     where
-        S: AsyncTaskManager + AsyncNotificationManager + AsyncStreamingHandler + Clone + Send + Sync + 'static,
+        S: AsyncTaskManager
+            + AsyncNotificationManager
+            + AsyncStreamingHandler
+            + Clone
+            + Send
+            + Sync
+            + 'static,
     {
         // Clone storage for both servers (they share the same Arc-wrapped data)
         let http_storage = storage.clone();

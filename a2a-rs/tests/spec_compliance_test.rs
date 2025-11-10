@@ -388,22 +388,22 @@ fn test_agent_card_v030_fields() {
 
     // Serialize and validate
     let card_json = serde_json::to_value(&card).unwrap();
-    println!("AgentCard v0.3.0: {}", serde_json::to_string_pretty(&card_json).unwrap());
+    println!(
+        "AgentCard v0.3.0: {}",
+        serde_json::to_string_pretty(&card_json).unwrap()
+    );
 
     // Verify the v0.3.0 fields are present
     assert_eq!(card_json["protocolVersion"], "0.3.0");
     assert_eq!(card_json["preferredTransport"], "JSONRPC");
     assert!(card_json["additionalInterfaces"].is_array());
-    assert_eq!(
-        card_json["additionalInterfaces"][0]["transport"],
-        "GRPC"
-    );
+    assert_eq!(card_json["additionalInterfaces"][0]["transport"], "GRPC");
     assert_eq!(card_json["iconUrl"], "https://example.com/icon.png");
     assert!(card_json["signatures"].is_array());
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let agent_card_schema = extract_definition(&schema_content, "AgentCard");
 
     let schema = Validator::options()
@@ -452,16 +452,22 @@ fn test_agent_capabilities_extensions() {
 
     // Serialize and verify
     let capabilities_json = serde_json::to_value(&capabilities).unwrap();
-    println!("AgentCapabilities with extensions: {}", serde_json::to_string_pretty(&capabilities_json).unwrap());
+    println!(
+        "AgentCapabilities with extensions: {}",
+        serde_json::to_string_pretty(&capabilities_json).unwrap()
+    );
 
     assert!(capabilities_json["extensions"].is_array());
-    assert_eq!(capabilities_json["extensions"][0]["uri"], "https://example.com/extensions/custom-auth");
+    assert_eq!(
+        capabilities_json["extensions"][0]["uri"],
+        "https://example.com/extensions/custom-auth"
+    );
     assert_eq!(capabilities_json["extensions"][0]["required"], true);
     assert_eq!(capabilities_json["extensions"][1]["required"], false);
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let capabilities_schema = extract_definition(&schema_content, "AgentCapabilities");
 
     let schema = Validator::options()
@@ -485,7 +491,10 @@ fn test_agent_skill_security() {
 
     // Create a skill with security requirements
     let mut security_req = HashMap::new();
-    security_req.insert("oauth2".to_string(), vec!["read:data".to_string(), "write:data".to_string()]);
+    security_req.insert(
+        "oauth2".to_string(),
+        vec!["read:data".to_string(), "write:data".to_string()],
+    );
 
     let skill = AgentSkill::new(
         "secure-operation".to_string(),
@@ -497,15 +506,18 @@ fn test_agent_skill_security() {
 
     // Serialize and verify
     let skill_json = serde_json::to_value(&skill).unwrap();
-    println!("AgentSkill with security: {}", serde_json::to_string_pretty(&skill_json).unwrap());
+    println!(
+        "AgentSkill with security: {}",
+        serde_json::to_string_pretty(&skill_json).unwrap()
+    );
 
     assert!(skill_json["security"].is_array());
     assert_eq!(skill_json["security"][0]["oauth2"][0], "read:data");
     assert_eq!(skill_json["security"][0]["oauth2"][1], "write:data");
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let skill_schema = extract_definition(&schema_content, "AgentSkill");
 
     let schema = Validator::options()
@@ -539,14 +551,20 @@ fn test_message_extensions_field() {
 
     // Serialize and verify
     let message_json = serde_json::to_value(&message).unwrap();
-    println!("Message with extensions: {}", serde_json::to_string_pretty(&message_json).unwrap());
+    println!(
+        "Message with extensions: {}",
+        serde_json::to_string_pretty(&message_json).unwrap()
+    );
 
     assert!(message_json["extensions"].is_array());
-    assert_eq!(message_json["extensions"][0], "https://example.com/extensions/custom-protocol");
+    assert_eq!(
+        message_json["extensions"][0],
+        "https://example.com/extensions/custom-protocol"
+    );
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let message_schema = extract_definition(&schema_content, "Message");
 
     let schema = Validator::options()
@@ -578,20 +596,26 @@ fn test_artifact_extensions_field() {
         }],
         metadata: None,
         extensions: Some(vec![
-            "https://example.com/extensions/artifact-encryption".to_string(),
+            "https://example.com/extensions/artifact-encryption".to_string()
         ]),
     };
 
     // Serialize and verify
     let artifact_json = serde_json::to_value(&artifact).unwrap();
-    println!("Artifact with extensions: {}", serde_json::to_string_pretty(&artifact_json).unwrap());
+    println!(
+        "Artifact with extensions: {}",
+        serde_json::to_string_pretty(&artifact_json).unwrap()
+    );
 
     assert!(artifact_json["extensions"].is_array());
-    assert_eq!(artifact_json["extensions"][0], "https://example.com/extensions/artifact-encryption");
+    assert_eq!(
+        artifact_json["extensions"][0],
+        "https://example.com/extensions/artifact-encryption"
+    );
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let artifact_schema = extract_definition(&schema_content, "Artifact");
 
     let schema = Validator::options()
@@ -618,14 +642,20 @@ fn test_mutual_tls_security_scheme() {
 
     // Serialize and verify
     let scheme_json = serde_json::to_value(&mtls_scheme).unwrap();
-    println!("MutualTLS SecurityScheme: {}", serde_json::to_string_pretty(&scheme_json).unwrap());
+    println!(
+        "MutualTLS SecurityScheme: {}",
+        serde_json::to_string_pretty(&scheme_json).unwrap()
+    );
 
     assert_eq!(scheme_json["type"], "mutualTLS");
-    assert_eq!(scheme_json["description"], "Client certificate authentication");
+    assert_eq!(
+        scheme_json["description"],
+        "Client certificate authentication"
+    );
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let security_schema = extract_definition(&schema_content, "SecurityScheme");
 
     let schema = Validator::options()
@@ -661,12 +691,17 @@ fn test_oauth2_with_metadata_url() {
             ..Default::default()
         }),
         description: Some("OAuth2 with metadata discovery".to_string()),
-        metadata_url: Some("https://auth.example.com/.well-known/oauth-authorization-server".to_string()),
+        metadata_url: Some(
+            "https://auth.example.com/.well-known/oauth-authorization-server".to_string(),
+        ),
     };
 
     // Serialize and verify
     let scheme_json = serde_json::to_value(&oauth2_scheme).unwrap();
-    println!("OAuth2 with metadata URL: {}", serde_json::to_string_pretty(&scheme_json).unwrap());
+    println!(
+        "OAuth2 with metadata URL: {}",
+        serde_json::to_string_pretty(&scheme_json).unwrap()
+    );
 
     assert_eq!(scheme_json["type"], "oauth2");
     assert_eq!(
@@ -675,8 +710,8 @@ fn test_oauth2_with_metadata_url() {
     );
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let security_schema = extract_definition(&schema_content, "SecurityScheme");
 
     let schema = Validator::options()
@@ -710,7 +745,10 @@ fn test_list_tasks_params() {
 
     // Serialize and verify
     let params_json = serde_json::to_value(&params).unwrap();
-    println!("ListTasksParams: {}", serde_json::to_string_pretty(&params_json).unwrap());
+    println!(
+        "ListTasksParams: {}",
+        serde_json::to_string_pretty(&params_json).unwrap()
+    );
 
     assert_eq!(params_json["contextId"], "ctx-123");
     assert_eq!(params_json["status"], "working");
@@ -720,8 +758,8 @@ fn test_list_tasks_params() {
     assert_eq!(params_json["lastUpdatedAfter"], 1704067200000_i64);
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let params_schema = extract_definition(&schema_content, "ListTasksParams");
 
     let schema = Validator::options()
@@ -751,14 +789,17 @@ fn test_push_notification_config_with_id() {
 
     // Serialize and verify
     let config_json = serde_json::to_value(&config).unwrap();
-    println!("PushNotificationConfig with id: {}", serde_json::to_string_pretty(&config_json).unwrap());
+    println!(
+        "PushNotificationConfig with id: {}",
+        serde_json::to_string_pretty(&config_json).unwrap()
+    );
 
     assert_eq!(config_json["id"], "config-abc123");
     assert_eq!(config_json["url"], "https://client.example.com/webhook");
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let config_schema = extract_definition(&schema_content, "PushNotificationConfig");
 
     let schema = Validator::options()
@@ -812,15 +853,18 @@ fn test_message_send_configuration_optional_accepted_output_modes() {
 
     // Serialize and verify
     let config_json = serde_json::to_value(&config).unwrap();
-    println!("MessageSendConfiguration: {}", serde_json::to_string_pretty(&config_json).unwrap());
+    println!(
+        "MessageSendConfiguration: {}",
+        serde_json::to_string_pretty(&config_json).unwrap()
+    );
 
     // acceptedOutputModes should not be serialized when None
     assert!(config_json.get("acceptedOutputModes").is_none());
     assert_eq!(config_json["historyLength"], 10);
 
     // Validate against schema
-    let schema_content =
-        fs::read_to_string("../spec/specification.json").expect("Failed to read specification.json");
+    let schema_content = fs::read_to_string("../spec/specification.json")
+        .expect("Failed to read specification.json");
     let config_schema = extract_definition(&schema_content, "MessageSendConfiguration");
 
     let schema = Validator::options()
@@ -926,7 +970,10 @@ async fn test_task_list_page_size_validation() {
         .expect("Failed to send request");
 
     // According to spec, page_size should be clamped, not return error
-    assert!(response.error.is_none(), "page_size > 100 should be clamped, not error");
+    assert!(
+        response.error.is_none(),
+        "page_size > 100 should be clamped, not error"
+    );
 
     // Test page_size < 1 (should clamp to 1, not error)
     let request = json_rpc::ListTasksRequest::new(Some(a2a_rs::domain::ListTasksParams {
@@ -940,7 +987,10 @@ async fn test_task_list_page_size_validation() {
         .expect("Failed to send request");
 
     // According to spec, page_size should be clamped, not return error
-    assert!(response.error.is_none(), "page_size < 1 should be clamped, not error");
+    assert!(
+        response.error.is_none(),
+        "page_size < 1 should be clamped, not error"
+    );
 
     shutdown_tx.send(()).ok();
 }
@@ -955,7 +1005,10 @@ fn test_all_a2a_error_codes_defined() {
         (A2AError::TaskNotCancelable("test-task".to_string()), -32002),
         (A2AError::PushNotificationNotSupported, -32003),
         (A2AError::UnsupportedOperation("test".to_string()), -32004),
-        (A2AError::ContentTypeNotSupported("test/type".to_string()), -32005),
+        (
+            A2AError::ContentTypeNotSupported("test/type".to_string()),
+            -32005,
+        ),
         (A2AError::InvalidAgentResponse("test".to_string()), -32006),
         (A2AError::AuthenticatedExtendedCardNotConfigured, -32007),
     ];
@@ -983,14 +1036,26 @@ fn test_jsonrpc_error_structure_compliance() {
 
     // Verify JSON-RPC error structure
     assert!(jsonrpc_error.is_object(), "Error should be an object");
-    assert!(jsonrpc_error.get("code").is_some(), "Error must have code field");
-    assert!(jsonrpc_error.get("message").is_some(), "Error must have message field");
+    assert!(
+        jsonrpc_error.get("code").is_some(),
+        "Error must have code field"
+    );
+    assert!(
+        jsonrpc_error.get("message").is_some(),
+        "Error must have message field"
+    );
 
     // code should be an integer
-    assert!(jsonrpc_error["code"].is_i64(), "Error code must be an integer");
+    assert!(
+        jsonrpc_error["code"].is_i64(),
+        "Error code must be an integer"
+    );
 
     // message should be a string
-    assert!(jsonrpc_error["message"].is_string(), "Error message must be a string");
+    assert!(
+        jsonrpc_error["message"].is_string(),
+        "Error message must be a string"
+    );
 }
 
 #[test]
@@ -1017,7 +1082,11 @@ fn test_task_state_transitions_validation() {
             format!("msg-{}", uuid::Uuid::new_v4()),
         );
         task.update_status(to_state.clone(), Some(msg));
-        assert_eq!(task.status.state, to_state, "Task should transition to {:?}", to_state);
+        assert_eq!(
+            task.status.state, to_state,
+            "Task should transition to {:?}",
+            to_state
+        );
     }
 }
 

@@ -102,7 +102,10 @@ where
                 Some(client)
             }
             Err(e) => {
-                warn!("Failed to initialize AI client: {}. Conversational features will be disabled.", e);
+                warn!(
+                    "Failed to initialize AI client: {}. Conversational features will be disabled.",
+                    e
+                );
                 None
             }
         };
@@ -265,7 +268,8 @@ Example response when asking for info:
   },
   "needs_clarification": ["amount"],
   "approval_reason": null
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     /// Extract text content from message parts
@@ -305,7 +309,9 @@ Example response when asking for info:
         task: Option<&Task>,
         current_message: &Message,
     ) -> Result<ReimbursementResponse, String> {
-        let ai_client = self.ai_client.as_ref()
+        let ai_client = self
+            .ai_client
+            .as_ref()
             .ok_or_else(|| "AI client not available - cannot process request".to_string())?;
 
         let system_prompt = self.get_system_prompt();
@@ -322,7 +328,11 @@ Example response when asking for info:
                             let (has_files, file_names) = self.has_file_attachments(msg);
 
                             let message_with_context = if has_files {
-                                format!("{}\n[User uploaded file(s): {}]", text, file_names.join(", "))
+                                format!(
+                                    "{}\n[User uploaded file(s): {}]",
+                                    text,
+                                    file_names.join(", ")
+                                )
                             } else {
                                 text
                             };
@@ -345,7 +355,11 @@ Example response when asking for info:
         // Check if current message has files
         let (has_files, file_names) = self.has_file_attachments(current_message);
         let current_message_text = if has_files {
-            format!("{}\n[User uploaded file(s): {}]", user_message, file_names.join(", "))
+            format!(
+                "{}\n[User uploaded file(s): {}]",
+                user_message,
+                file_names.join(", ")
+            )
         } else {
             user_message.to_string()
         };
@@ -354,7 +368,9 @@ Example response when asking for info:
         history.push(ChatMessage::user(current_message_text));
 
         // Get AI response with JSON mode enforced
-        let ai_response = ai_client.ask_with_history_json(&system_prompt, history).await?;
+        let ai_response = ai_client
+            .ask_with_history_json(&system_prompt, history)
+            .await?;
 
         info!(response_length = ai_response.len(), "Received AI response");
 
@@ -397,12 +413,18 @@ Example response when asking for info:
             has_receipt: Option<bool>,
         }
 
-        let parsed: AiResponse = serde_json::from_str(json_str)
-            .map_err(|e| format!("Failed to parse AI response as JSON: {}. Response was: {}", e, ai_response))?;
+        let parsed: AiResponse = serde_json::from_str(json_str).map_err(|e| {
+            format!(
+                "Failed to parse AI response as JSON: {}. Response was: {}",
+                e, ai_response
+            )
+        })?;
 
         match parsed.action.as_str() {
             "approved" | "pending" => {
-                let extracted = parsed.extracted_data.ok_or("Missing extracted_data for approval")?;
+                let extracted = parsed
+                    .extracted_data
+                    .ok_or("Missing extracted_data for approval")?;
 
                 let amount = Money::Number {
                     amount: extracted.amount.ok_or("Missing amount")?,
@@ -447,17 +469,13 @@ Example response when asking for info:
                     },
                 })
             }
-            "error" => {
-                Ok(ReimbursementResponse::Error {
-                    code: "PROCESSING_ERROR".to_string(),
-                    message: parsed.message,
-                    field: None,
-                    suggestions: None,
-                })
-            }
-            _ => {
-                Err(format!("Unknown action from AI: {}", parsed.action))
-            }
+            "error" => Ok(ReimbursementResponse::Error {
+                code: "PROCESSING_ERROR".to_string(),
+                message: parsed.message,
+                field: None,
+                suggestions: None,
+            }),
+            _ => Err(format!("Unknown action from AI: {}", parsed.action)),
         }
     }
 
@@ -582,16 +600,16 @@ Example response when asking for info:
                 })
                 .or_else(|| {
                     // Try expense_type from metadata
-                    data.get("expense_type")
-                        .and_then(|v| v.as_str())
-                        .map(|s| match s.to_lowercase().as_str() {
+                    data.get("expense_type").and_then(|v| v.as_str()).map(|s| {
+                        match s.to_lowercase().as_str() {
                             "travel" => ExpenseCategory::Travel,
                             "meals" | "meal" => ExpenseCategory::Meals,
                             "supplies" | "supply" => ExpenseCategory::Supplies,
                             "equipment" => ExpenseCategory::Equipment,
                             "training" => ExpenseCategory::Training,
                             _ => ExpenseCategory::Other,
-                        })
+                        }
+                    })
                 });
 
             let notes = data
@@ -742,11 +760,7 @@ Example response when asking for info:
         if let Some(desc_pos) = text.find("Description:") {
             // Extract text from "Description:" until next line or end
             let desc_start = desc_pos + "Description:".len();
-            let purpose_text = text[desc_start..]
-                .lines()
-                .next()
-                .unwrap_or("")
-                .trim();
+            let purpose_text = text[desc_start..].lines().next().unwrap_or("").trim();
             if !purpose_text.is_empty() {
                 purpose = Some(purpose_text.to_string());
             }
@@ -1230,7 +1244,10 @@ where
         message: &'a Message,
         _session_id: Option<&'a str>,
     ) -> Result<Task, A2AError> {
-        error!("🚨 HANDLER CALLED: Processing reimbursement request for task_id={}", task_id);
+        error!(
+            "🚨 HANDLER CALLED: Processing reimbursement request for task_id={}",
+            task_id
+        );
         info!("Processing reimbursement request");
 
         // Check if task exists and get its current state
@@ -1242,7 +1259,9 @@ where
 
         // If task doesn't exist, create it
         if existing_task.is_none() {
-            let context_id = message.context_id.as_ref()
+            let context_id = message
+                .context_id
+                .as_ref()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| Uuid::new_v4().to_string());
             self.task_manager.create_task(task_id, &context_id).await?;
@@ -1267,7 +1286,8 @@ where
                     .build();
 
                 // Add agent response and return
-                let final_task = self.task_manager
+                let final_task = self
+                    .task_manager
                     .update_task_status(task_id, TaskState::Completed, Some(response_message))
                     .await?;
 
@@ -1309,7 +1329,11 @@ where
             let text_content = handler.extract_text_from_message(&message_owned);
 
             // Get current task for context
-            let current_task = match handler.task_manager.get_task(&task_id_owned, Some(50)).await {
+            let current_task = match handler
+                .task_manager
+                .get_task(&task_id_owned, Some(50))
+                .await
+            {
                 Ok(task) => {
                     info!(task_id = %task_id_owned, history_count = task.history.as_ref().map(|h| h.len()).unwrap_or(0), "Retrieved task for AI processing");
                     Some(task)
@@ -1322,7 +1346,10 @@ where
 
             // Process with AI
             info!(task_id = %task_id_owned, "Calling AI for processing");
-            let (response, auto_approved) = match handler.process_with_ai(&text_content, current_task.as_ref(), &message_owned).await {
+            let (response, auto_approved) = match handler
+                .process_with_ai(&text_content, current_task.as_ref(), &message_owned)
+                .await
+            {
                 Ok(resp) => {
                     info!(task_id = %task_id_owned, response_type = ?std::mem::discriminant(&resp), "AI processed request successfully");
                     let auto_approved = matches!(&resp, ReimbursementResponse::Result { status, .. } if matches!(status, super::types::ProcessingStatus::Approved));
@@ -1375,9 +1402,11 @@ where
 
             // Update task with AI response
             info!(task_id = %task_id_owned, new_state = ?task_state, "Updating task with AI response");
-            match handler.task_manager
+            match handler
+                .task_manager
                 .update_task_status(&task_id_owned, task_state.clone(), Some(response_message))
-                .await {
+                .await
+            {
                 Ok(updated_task) => {
                     info!(
                         task_id = %task_id_owned,

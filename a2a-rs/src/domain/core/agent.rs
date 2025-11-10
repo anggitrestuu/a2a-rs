@@ -343,7 +343,10 @@ pub struct AgentCard {
     #[builder(default = default_preferred_transport())]
     pub preferred_transport: String,
     /// Additional supported interfaces (transport and URL combinations) (v0.3.0)
-    #[serde(skip_serializing_if = "Option::is_none", rename = "additionalInterfaces")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "additionalInterfaces"
+    )]
     pub additional_interfaces: Option<Vec<AgentInterface>>,
     /// Optional URL to an icon for the agent (v0.3.0)
     #[serde(skip_serializing_if = "Option::is_none", rename = "iconUrl")]
@@ -535,7 +538,10 @@ mod tests {
 
         let json_value = serde_json::to_value(&card).unwrap();
         assert!(json_value["signatures"].is_array());
-        assert_eq!(json_value["signatures"][0]["protected"], "eyJhbGciOiJSUzI1NiJ9");
+        assert_eq!(
+            json_value["signatures"][0]["protected"],
+            "eyJhbGciOiJSUzI1NiJ9"
+        );
         assert_eq!(json_value["supportsAuthenticatedExtendedCard"], true);
         assert_eq!(json_value["protocolVersion"], "0.3.0");
     }

@@ -282,7 +282,10 @@ where
         request: &crate::application::handlers::task::GetTaskPushNotificationConfigRequest,
     ) -> Result<JSONRPCResponse, A2AError> {
         if let Some(ref params) = request.params {
-            let result = self.task_manager.get_push_notification_config(params).await?;
+            let result = self
+                .task_manager
+                .get_push_notification_config(params)
+                .await?;
 
             Ok(JSONRPCResponse::success(
                 request.id.clone(),

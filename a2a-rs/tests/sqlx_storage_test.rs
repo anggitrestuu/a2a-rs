@@ -340,8 +340,12 @@ mod sqlx_tests {
         storage.create_task("task-a-2", "context-a").await?;
         storage.create_task("task-b-1", "context-b").await?;
 
-        storage.update_task_status("task-a-1", TaskState::Working, None).await?;
-        storage.update_task_status("task-a-2", TaskState::Completed, None).await?;
+        storage
+            .update_task_status("task-a-1", TaskState::Working, None)
+            .await?;
+        storage
+            .update_task_status("task-a-2", TaskState::Completed, None)
+            .await?;
 
         // Filter by context
         let params = a2a_rs::domain::ListTasksParams {
@@ -368,7 +372,9 @@ mod sqlx_tests {
 
         // Create 10 tasks
         for i in 0..10 {
-            storage.create_task(&format!("task-{}", i), "test-context").await?;
+            storage
+                .create_task(&format!("task-{}", i), "test-context")
+                .await?;
         }
 
         // Get first page
@@ -378,7 +384,10 @@ mod sqlx_tests {
         };
         let page1 = storage.list_tasks_v3(&params).await?;
         assert_eq!(page1.tasks.len(), 3, "Should return 3 tasks");
-        assert!(!page1.next_page_token.is_empty(), "Should have next page token");
+        assert!(
+            !page1.next_page_token.is_empty(),
+            "Should have next page token"
+        );
 
         // Get second page
         let params = a2a_rs::domain::ListTasksParams {
@@ -393,8 +402,7 @@ mod sqlx_tests {
     }
 
     #[tokio::test]
-    async fn test_push_notification_config_v3_crud() -> Result<(), Box<dyn std::error::Error>>
-    {
+    async fn test_push_notification_config_v3_crud() -> Result<(), Box<dyn std::error::Error>> {
         let storage = create_test_storage().await?;
         let task_id = Uuid::new_v4().to_string();
 
@@ -420,8 +428,14 @@ mod sqlx_tests {
             metadata: None,
         };
         let retrieved = storage.get_push_notification_config(&get_params).await?;
-        assert_eq!(retrieved.push_notification_config.url, "https://example.com/webhook");
-        assert_eq!(retrieved.push_notification_config.token, Some("test-token".to_string()));
+        assert_eq!(
+            retrieved.push_notification_config.url,
+            "https://example.com/webhook"
+        );
+        assert_eq!(
+            retrieved.push_notification_config.token,
+            Some("test-token".to_string())
+        );
 
         // List configs
         let list_params = a2a_rs::domain::ListTaskPushNotificationConfigParams {
@@ -437,7 +451,9 @@ mod sqlx_tests {
             push_notification_config_id: "config-1".to_string(),
             metadata: None,
         };
-        storage.delete_push_notification_config(&delete_params).await?;
+        storage
+            .delete_push_notification_config(&delete_params)
+            .await?;
 
         // Verify deleted
         let configs = storage.list_push_notification_configs(&list_params).await?;
@@ -447,8 +463,7 @@ mod sqlx_tests {
     }
 
     #[tokio::test]
-    async fn test_push_notification_config_v3_multiple() -> Result<(), Box<dyn std::error::Error>>
-    {
+    async fn test_push_notification_config_v3_multiple() -> Result<(), Box<dyn std::error::Error>> {
         let storage = create_test_storage().await?;
         let task_id = Uuid::new_v4().to_string();
 

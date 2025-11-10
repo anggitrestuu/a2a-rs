@@ -414,8 +414,16 @@ impl AsyncTaskManager for InMemoryTaskStorage {
 
         // Sort by timestamp (most recent first)
         filtered_tasks.sort_by(|a, b| {
-            let a_time = a.status.timestamp.map(|t| t.timestamp_millis()).unwrap_or(0);
-            let b_time = b.status.timestamp.map(|t| t.timestamp_millis()).unwrap_or(0);
+            let a_time = a
+                .status
+                .timestamp
+                .map(|t| t.timestamp_millis())
+                .unwrap_or(0);
+            let b_time = b
+                .status
+                .timestamp
+                .map(|t| t.timestamp_millis())
+                .unwrap_or(0);
             b_time.cmp(&a_time)
         });
 
@@ -477,7 +485,11 @@ impl AsyncTaskManager for InMemoryTaskStorage {
     ) -> Result<Vec<crate::domain::TaskPushNotificationConfig>, A2AError> {
         // For in-memory storage, we only support one config per task
         // Return it as a single-item vec
-        match self.push_notification_registry.get_config(&params.id).await? {
+        match self
+            .push_notification_registry
+            .get_config(&params.id)
+            .await?
+        {
             Some(config) => Ok(vec![crate::domain::TaskPushNotificationConfig {
                 task_id: params.id.clone(),
                 push_notification_config: config,
@@ -579,7 +591,9 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         // Try to get the current status to send as an initial update
         // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
         if let Ok(task) = self.get_task(task_id, None).await {
-            let _ = self.broadcast_status_update(task_id, task.status, false).await;
+            let _ = self
+                .broadcast_status_update(task_id, task.status, false)
+                .await;
         }
 
         Ok(format!("status-{}-{}", task_id, uuid::Uuid::new_v4()))
@@ -606,7 +620,9 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         if let Ok(task) = self.get_task(task_id, None).await {
             if let Some(artifacts) = task.artifacts {
                 for artifact in artifacts {
-                    let _ = self.broadcast_artifact_update(task_id, artifact, None, false).await;
+                    let _ = self
+                        .broadcast_artifact_update(task_id, artifact, None, false)
+                        .await;
                 }
             }
         }

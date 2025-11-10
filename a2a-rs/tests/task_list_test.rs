@@ -40,11 +40,7 @@ async fn setup_server_with_tasks(port: u16) -> (oneshot::Sender<()>, InMemoryTas
     .with_state_transition_history();
 
     // Create the server
-    let server = HttpServer::new(
-        processor,
-        agent_info,
-        format!("127.0.0.1:{}", port),
-    );
+    let server = HttpServer::new(processor, agent_info, format!("127.0.0.1:{}", port));
 
     // Create a shutdown channel
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
@@ -156,10 +152,7 @@ async fn test_task_list_filter_by_context() {
     // All returned tasks should be in context A
     assert_eq!(result.total_size, 3, "Should have 3 tasks in context A");
     for task in &result.tasks {
-        assert_eq!(
-            task.context_id, context_a,
-            "Task should be in context A"
-        );
+        assert_eq!(task.context_id, context_a, "Task should be in context A");
     }
 
     // List tasks in context B
@@ -174,10 +167,7 @@ async fn test_task_list_filter_by_context() {
 
     assert_eq!(result.total_size, 2, "Should have 2 tasks in context B");
     for task in &result.tasks {
-        assert_eq!(
-            task.context_id, context_b,
-            "Task should be in context B"
-        );
+        assert_eq!(task.context_id, context_b, "Task should be in context B");
     }
 
     shutdown_tx.send(()).ok();
@@ -321,11 +311,7 @@ async fn test_task_list_pagination() {
         .expect("Failed to list tasks page 2");
 
     assert_eq!(result_page2.page_size, 3, "Page size should be 3");
-    assert_eq!(
-        result_page2.tasks.len(),
-        3,
-        "Should return exactly 3 tasks"
-    );
+    assert_eq!(result_page2.tasks.len(), 3, "Should return exactly 3 tasks");
 
     // Verify tasks are different between pages
     let page1_ids: Vec<_> = result.tasks.iter().map(|t| &t.id).collect();
@@ -370,10 +356,7 @@ async fn test_task_list_page_size_clamping() {
         .await
         .expect("Failed to list tasks");
 
-    assert_eq!(
-        result.page_size, 100,
-        "Page size should be clamped to 100"
-    );
+    assert_eq!(result.page_size, 100, "Page size should be clamped to 100");
 
     shutdown_tx.send(()).ok();
 }
@@ -418,11 +401,7 @@ async fn test_task_list_history_length() {
         .expect("Task not found");
 
     if let Some(history) = &task.history {
-        assert_eq!(
-            history.len(),
-            2,
-            "History should be limited to 2 messages"
-        );
+        assert_eq!(history.len(), 2, "History should be limited to 2 messages");
     }
 
     // List tasks with history_length = 0 (no history)

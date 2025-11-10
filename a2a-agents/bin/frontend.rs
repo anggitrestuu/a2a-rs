@@ -1,18 +1,17 @@
+use a2a_client::{
+    components::{create_sse_stream, MessageView, TaskView},
+    WebA2AClient,
+};
 use a2a_rs::{
     domain::{ListTasksParams, TaskState, TaskStatusUpdateEvent},
     services::AsyncA2AClient,
 };
-use a2a_client::{
-    components::{TaskView, MessageView, create_sse_stream},
-    WebA2AClient,
-};
+use anyhow;
 use askama::Template;
 use askama_axum::IntoResponse;
 use axum::{
-    extract::{Path, Query, State, Multipart},
-    response::{
-        Response as AxumResponse,
-    },
+    extract::{Multipart, Path, Query, State},
+    response::Response as AxumResponse,
     routing::{get, post},
     Form, Router,
 };
@@ -22,7 +21,6 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tracing::{error, info, warn};
 use uuid::Uuid;
-use anyhow;
 
 struct AppState {
     client: Arc<WebA2AClient>,
@@ -101,8 +99,8 @@ async fn main() -> anyhow::Result<()> {
         .or_else(|_| std::env::var("AGENT_URL"))
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
-    let ws_url = std::env::var("AGENT_WS_URL")
-        .unwrap_or_else(|_| "ws://localhost:8081".to_string());
+    let ws_url =
+        std::env::var("AGENT_WS_URL").unwrap_or_else(|_| "ws://localhost:8081".to_string());
 
     // Check if we should use WebSocket or HTTP client
     let use_websocket = std::env::var("USE_WEBSOCKET")
@@ -120,12 +118,11 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Generate or load webhook authentication token
-    let webhook_token = std::env::var("WEBHOOK_TOKEN")
-        .unwrap_or_else(|_| {
-            let token = format!("wh_{}", Uuid::new_v4().simple());
-            info!("Generated webhook token: {}", token);
-            token
-        });
+    let webhook_token = std::env::var("WEBHOOK_TOKEN").unwrap_or_else(|_| {
+        let token = format!("wh_{}", Uuid::new_v4().simple());
+        info!("Generated webhook token: {}", token);
+        token
+    });
 
     let state = AppState {
         client: Arc::new(client),
@@ -161,9 +158,7 @@ async fn index() -> impl IntoResponse {
         .or_else(|_| std::env::var("AGENT_URL"))
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
 
-    IndexTemplate {
-        agent_url,
-    }
+    IndexTemplate { agent_url }
 }
 
 async fn expense_form(Query(query): Query<ExpenseQuery>) -> impl IntoResponse {
@@ -218,16 +213,19 @@ async fn submit_expense(
 
     // Send the initial expense request to create the task
     let response = state
-        .client.http
+        .client
+        .http
         .send_task_message(&task_id, &message, None, Some(50))
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to submit expense: {}", e)))?;
 
-    info!("Expense submitted for task {}, response state: {:?}",
-          task_id, response.status.state);
+    info!(
+        "Expense submitted for task {}, response state: {:?}",
+        task_id, response.status.state
+    );
 
     // Register push notification for this task
-    use a2a_rs::domain::{TaskPushNotificationConfig, PushNotificationConfig};
+    use a2a_rs::domain::{PushNotificationConfig, TaskPushNotificationConfig};
 
     let push_config = TaskPushNotificationConfig {
         task_id: task_id.clone(),
@@ -239,8 +237,16 @@ async fn submit_expense(
         },
     };
 
-    match state.client.http.set_task_push_notification(&push_config).await {
-        Ok(_) => info!("Push notification registered for expense task {} with authentication", task_id),
+    match state
+        .client
+        .http
+        .set_task_push_notification(&push_config)
+        .await
+    {
+        Ok(_) => info!(
+            "Push notification registered for expense task {} with authentication",
+            task_id
+        ),
         Err(e) => warn!("Failed to register push notification: {}", e),
     }
 
@@ -280,16 +286,13 @@ async fn tasks_page(
 
     // Use HTTP client for all API operations
     let result = state
-        .client.http
+        .client
+        .http
         .list_tasks(&params)
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to list tasks: {}", e)))?;
 
-    let tasks: Vec<TaskView> = result
-        .tasks
-        .into_iter()
-        .map(TaskView::from_task)
-        .collect();
+    let tasks: Vec<TaskView> = result.tasks.into_iter().map(TaskView::from_task).collect();
 
     let template = TasksTemplate {
         tasks,
@@ -312,7 +315,11 @@ async fn chat_page(
     let (messages, task_state) = loop {
         match state.client.http.get_task(&task_id, Some(50)).await {
             Ok(task) => {
-                info!("Retrieved task {} with {} history items", task_id, task.history.as_ref().map(|h| h.len()).unwrap_or(0));
+                info!(
+                    "Retrieved task {} with {} history items",
+                    task_id,
+                    task.history.as_ref().map(|h| h.len()).unwrap_or(0)
+                );
 
                 let state = Some(format!("{:?}", task.status.state));
                 let messages = task
@@ -326,12 +333,18 @@ async fn chat_page(
             Err(e) => {
                 retry_count += 1;
                 if retry_count >= max_retries {
-                    warn!("Failed to get task {} after {} retries: {}", task_id, max_retries, e);
+                    warn!(
+                        "Failed to get task {} after {} retries: {}",
+                        task_id, max_retries, e
+                    );
                     // New task or not found, no messages yet
                     break (vec![], None);
                 }
                 // Wait a bit and retry
-                info!("Task {} not found, retrying ({}/{})", task_id, retry_count, max_retries);
+                info!(
+                    "Task {} not found, retrying ({}/{})",
+                    task_id, retry_count, max_retries
+                );
                 tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
             }
         }
@@ -349,31 +362,49 @@ async fn send_message(
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<AxumResponse, AppError> {
-    use a2a_rs::domain::{Message, Part, Role, FileContent};
+    use a2a_rs::domain::{FileContent, Message, Part, Role};
 
     let mut task_id = String::new();
     let mut message_text = String::new();
     let mut parts = Vec::new();
 
     // Process multipart form data
-    while let Some(field) = multipart.next_field().await.map_err(|e| AppError(anyhow::anyhow!("Failed to read multipart field: {}", e)))? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError(anyhow::anyhow!("Failed to read multipart field: {}", e)))?
+    {
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
             "task_id" => {
-                task_id = field.text().await.map_err(|e| AppError(anyhow::anyhow!("Failed to read task_id: {}", e)))?;
+                task_id = field
+                    .text()
+                    .await
+                    .map_err(|e| AppError(anyhow::anyhow!("Failed to read task_id: {}", e)))?;
             }
             "message" => {
-                message_text = field.text().await.map_err(|e| AppError(anyhow::anyhow!("Failed to read message: {}", e)))?;
+                message_text = field
+                    .text()
+                    .await
+                    .map_err(|e| AppError(anyhow::anyhow!("Failed to read message: {}", e)))?;
             }
             "receipt" => {
                 // Extract file data
                 let file_name = field.file_name().map(|s| s.to_string());
                 let content_type = field.content_type().map(|s| s.to_string());
-                let data = field.bytes().await.map_err(|e| AppError(anyhow::anyhow!("Failed to read file: {}", e)))?;
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError(anyhow::anyhow!("Failed to read file: {}", e)))?;
 
                 if !data.is_empty() {
-                    info!("Received file upload: name={:?}, type={:?}, size={} bytes", file_name, content_type, data.len());
+                    info!(
+                        "Received file upload: name={:?}, type={:?}, size={} bytes",
+                        file_name,
+                        content_type,
+                        data.len()
+                    );
 
                     // Encode bytes as base64
                     use base64::Engine;
@@ -425,17 +456,20 @@ async fn send_message(
 
     // Send message using HTTP client
     let response = state
-        .client.http
+        .client
+        .http
         .send_task_message(&task_id, &message, None, Some(50))
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to send message: {}", e)))?;
 
-    info!("Message sent successfully for task {}, response has {} history items",
-          task_id,
-          response.history.as_ref().map(|h| h.len()).unwrap_or(0));
+    info!(
+        "Message sent successfully for task {}, response has {} history items",
+        task_id,
+        response.history.as_ref().map(|h| h.len()).unwrap_or(0)
+    );
 
     // Register push notification for this task to get notified when agent responds
-    use a2a_rs::domain::{TaskPushNotificationConfig, PushNotificationConfig};
+    use a2a_rs::domain::{PushNotificationConfig, TaskPushNotificationConfig};
 
     let push_config = TaskPushNotificationConfig {
         task_id: task_id.clone(),
@@ -448,9 +482,20 @@ async fn send_message(
     };
 
     // Try to register push notification (don't fail if it doesn't work)
-    match state.client.http.set_task_push_notification(&push_config).await {
-        Ok(_) => info!("Push notification registered for task {} with authentication", task_id),
-        Err(e) => warn!("Failed to register push notification for task {}: {}", task_id, e),
+    match state
+        .client
+        .http
+        .set_task_push_notification(&push_config)
+        .await
+    {
+        Ok(_) => info!(
+            "Push notification registered for task {} with authentication",
+            task_id
+        ),
+        Err(e) => warn!(
+            "Failed to register push notification for task {}: {}",
+            task_id, e
+        ),
     }
 
     // Wait a bit longer to ensure task is persisted
@@ -465,7 +510,8 @@ async fn cancel_task(
     Path(task_id): Path<String>,
 ) -> Result<AxumResponse, AppError> {
     state
-        .client.http
+        .client
+        .http
         .cancel_task(&task_id)
         .await
         .map_err(|e| AppError(anyhow::anyhow!("Failed to cancel task: {}", e)))?;
@@ -477,7 +523,9 @@ async fn cancel_task(
 async fn stream_task(
     State(state): State<Arc<AppState>>,
     Path(task_id): Path<String>,
-) -> axum::response::sse::Sse<impl futures::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>> {
+) -> axum::response::sse::Sse<
+    impl futures::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>,
+> {
     // Use the generic streaming component from a2a-client
     create_sse_stream(state.client.clone(), task_id)
 }
@@ -501,12 +549,17 @@ async fn handle_push_notification(
     };
 
     if !authenticated {
-        warn!("Unauthorized push notification attempt for task {}", event.task_id);
+        warn!(
+            "Unauthorized push notification attempt for task {}",
+            event.task_id
+        );
         return Err(AppError(anyhow::anyhow!("Unauthorized")));
     }
 
-    info!("✅ Authenticated push notification for task {}: state={:?}",
-          event.task_id, event.status.state);
+    info!(
+        "✅ Authenticated push notification for task {}: state={:?}",
+        event.task_id, event.status.state
+    );
 
     // Log the event - in a real app, you might:
     // - Store it in a database
@@ -518,7 +571,8 @@ async fn handle_push_notification(
         "status": "received",
         "task_id": event.task_id,
         "authenticated": true
-    })).into_response())
+    }))
+    .into_response())
 }
 
 #[derive(Debug)]

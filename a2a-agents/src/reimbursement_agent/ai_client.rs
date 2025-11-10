@@ -13,21 +13,19 @@ pub struct AiConfig {
 impl AiConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, String> {
-        let base_url = env::var("AI_API_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:11434/v1".to_string());
+        let base_url =
+            env::var("AI_API_BASE_URL").unwrap_or_else(|_| "http://localhost:11434/v1".to_string());
 
-        let model = env::var("AI_MODEL")
-            .unwrap_or_else(|_| "ministral".to_string());
+        let model = env::var("AI_MODEL").unwrap_or_else(|_| "ministral".to_string());
 
-        let api_key = env::var("AI_API_KEY").ok()
-            .and_then(|key| {
-                let trimmed = key.trim();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed.to_string())
-                }
-            });
+        let api_key = env::var("AI_API_KEY").ok().and_then(|key| {
+            let trimmed = key.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        });
 
         Ok(Self {
             base_url,
@@ -160,17 +158,17 @@ impl AiClient {
             req_builder = req_builder.bearer_auth(api_key);
         }
 
-        let response = req_builder
-            .send()
-            .await
-            .map_err(|e| {
-                error!(error = %e, "Failed to send request to AI API");
-                format!("Failed to send request: {}", e)
-            })?;
+        let response = req_builder.send().await.map_err(|e| {
+            error!(error = %e, "Failed to send request to AI API");
+            format!("Failed to send request: {}", e)
+        })?;
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
             error!(status = %status, error = %error_text, "AI API returned error");
             return Err(format!("AI API error ({}): {}", status, error_text));
         }
@@ -208,7 +206,8 @@ impl AiClient {
             ChatMessage::user(user_question),
         ];
 
-        self.chat_completion(messages, Some(0.7), Some(500), false).await
+        self.chat_completion(messages, Some(0.7), Some(500), false)
+            .await
     }
 
     /// Ask a question with conversation history
@@ -220,7 +219,8 @@ impl AiClient {
         let mut messages = vec![ChatMessage::system(system_prompt)];
         messages.extend(history);
 
-        self.chat_completion(messages, Some(0.7), Some(500), false).await
+        self.chat_completion(messages, Some(0.7), Some(500), false)
+            .await
     }
 
     /// Ask a question with conversation history and force JSON response
@@ -232,7 +232,8 @@ impl AiClient {
         let mut messages = vec![ChatMessage::system(system_prompt)];
         messages.extend(history);
 
-        self.chat_completion(messages, Some(0.7), Some(500), true).await
+        self.chat_completion(messages, Some(0.7), Some(500), true)
+            .await
     }
 }
 

@@ -182,10 +182,7 @@ async fn test_http_client_list_tasks_pagination() {
             .expect("Failed to fetch next page");
 
         println!("Next page result: {:?}", next_result);
-        assert!(
-            !next_result.tasks.is_empty(),
-            "Next page should have tasks"
-        );
+        assert!(!next_result.tasks.is_empty(), "Next page should have tasks");
     }
 
     shutdown_tx.send(()).ok();
@@ -214,10 +211,7 @@ async fn test_http_client_list_tasks_history_length() {
     // Verify that tasks have history
     for task in &result.tasks {
         if let Some(ref history) = task.history {
-            assert!(
-                history.len() <= 5,
-                "History should be limited to 5 entries"
-            );
+            assert!(history.len() <= 5, "History should be limited to 5 entries");
         }
     }
 
@@ -444,14 +438,15 @@ async fn test_http_client_push_config_multiple() {
 
     // Since set_task_push_notification replaces configs (not appends),
     // we should have the last config set
-    assert!(
-        !configs.is_empty(),
-        "Should have at least one config"
-    );
+    assert!(!configs.is_empty(), "Should have at least one config");
 
     // The config should be one of the ones we set
     let has_our_configs = configs.iter().any(|c| {
-        c.push_notification_config.id.as_ref().map(|id| id.starts_with("config-multi-")).unwrap_or(false)
+        c.push_notification_config
+            .id
+            .as_ref()
+            .map(|id| id.starts_with("config-multi-"))
+            .unwrap_or(false)
     });
     assert!(has_our_configs, "Should have our configs");
 
@@ -564,7 +559,10 @@ async fn test_http_client_push_config_not_found() {
     println!("Not found result: {:?}", result);
 
     // Should return an error (either TaskNotFound or config not found)
-    assert!(result.is_err(), "Should return error for non-existent config");
+    assert!(
+        result.is_err(),
+        "Should return error for non-existent config"
+    );
 
     shutdown_tx.send(()).ok();
 }

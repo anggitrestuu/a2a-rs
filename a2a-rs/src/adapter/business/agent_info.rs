@@ -264,7 +264,11 @@ impl AgentInfoProvider for SimpleAgentInfo {
 
     // Override to provide authenticated extended card when configured (v0.3.0)
     async fn get_authenticated_extended_card(&self) -> Result<AgentCard, A2AError> {
-        if self.card.supports_authenticated_extended_card.unwrap_or(false) {
+        if self
+            .card
+            .supports_authenticated_extended_card
+            .unwrap_or(false)
+        {
             // Return the same card for now
             // In a real implementation, this might include additional authenticated-only fields
             Ok(self.card.clone())

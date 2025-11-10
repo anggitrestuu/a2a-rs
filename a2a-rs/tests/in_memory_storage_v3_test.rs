@@ -692,7 +692,10 @@ async fn test_get_push_notification_config() {
         retrieved.push_notification_config.url,
         "https://example.com/webhook"
     );
-    assert_eq!(retrieved.push_notification_config.token, Some("test-token".to_string()));
+    assert_eq!(
+        retrieved.push_notification_config.token,
+        Some("test-token".to_string())
+    );
 }
 
 #[tokio::test]
@@ -708,7 +711,10 @@ async fn test_get_push_notification_config_not_found() {
     };
 
     let result = storage.get_push_notification_config(&params).await;
-    assert!(result.is_err(), "Should return error for non-existent config");
+    assert!(
+        result.is_err(),
+        "Should return error for non-existent config"
+    );
 }
 
 #[tokio::test]
@@ -837,7 +843,9 @@ async fn test_delete_push_notification_config_idempotent() {
         metadata: None,
     };
 
-    let result = storage.delete_push_notification_config(&delete_params).await;
+    let result = storage
+        .delete_push_notification_config(&delete_params)
+        .await;
     // Should succeed (idempotent behavior)
     assert!(
         result.is_ok(),

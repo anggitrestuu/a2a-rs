@@ -98,14 +98,17 @@ async fn test_get_authenticated_extended_card_success() {
 
     // Should return successful response with AgentCard
     if let Some(ref err) = response.error {
-        eprintln!("Unexpected error: code={}, message={}", err.code, err.message);
+        eprintln!(
+            "Unexpected error: code={}, message={}",
+            err.code, err.message
+        );
     }
     assert!(response.error.is_none(), "Should not have error response");
     assert!(response.result.is_some(), "Should have result");
 
     let card_value = response.result.unwrap();
-    let card: a2a_rs::domain::AgentCard = serde_json::from_value(card_value)
-        .expect("Failed to parse AgentCard");
+    let card: a2a_rs::domain::AgentCard =
+        serde_json::from_value(card_value).expect("Failed to parse AgentCard");
 
     // Verify it's a valid agent card
     assert_eq!(card.name, "Authenticated Card Test Agent");
@@ -149,9 +152,8 @@ async fn test_authenticated_card_vs_regular_card() {
         .await
         .expect("Failed to send request");
 
-    let auth_card: a2a_rs::domain::AgentCard =
-        serde_json::from_value(response.result.unwrap())
-            .expect("Failed to parse authenticated card");
+    let auth_card: a2a_rs::domain::AgentCard = serde_json::from_value(response.result.unwrap())
+        .expect("Failed to parse authenticated card");
 
     // Both should have same basic info
     assert_eq!(regular_card.name, auth_card.name);
@@ -159,8 +161,12 @@ async fn test_authenticated_card_vs_regular_card() {
     assert_eq!(regular_card.protocol_version, auth_card.protocol_version);
 
     // Both should indicate support for authenticated extended card
-    assert!(regular_card.supports_authenticated_extended_card.unwrap_or(false));
-    assert!(auth_card.supports_authenticated_extended_card.unwrap_or(false));
+    assert!(regular_card
+        .supports_authenticated_extended_card
+        .unwrap_or(false));
+    assert!(auth_card
+        .supports_authenticated_extended_card
+        .unwrap_or(false));
 
     shutdown_tx.send(()).ok();
 }
@@ -223,8 +229,7 @@ async fn test_authenticated_card_with_extensions() {
         .expect("Failed to send request");
 
     let card: a2a_rs::domain::AgentCard =
-        serde_json::from_value(response.result.unwrap())
-            .expect("Failed to parse card");
+        serde_json::from_value(response.result.unwrap()).expect("Failed to parse card");
 
     // Card should have v0.3.0 fields
     assert_eq!(card.protocol_version, "0.3.0");

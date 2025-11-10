@@ -502,10 +502,11 @@ impl AsyncA2AClient for WebSocketClient {
                         Some(Ok(msg)) => msg,
                         Some(Err(e)) => {
                             return Some((
-                                Err(
-                                    WebSocketClientError::Message(format!("WebSocket error: {}", e))
-                                        .into(),
-                                ),
+                                Err(WebSocketClientError::Message(format!(
+                                    "WebSocket error: {}",
+                                    e
+                                ))
+                                .into()),
                                 conn,
                             ));
                         }
@@ -517,100 +518,110 @@ impl AsyncA2AClient for WebSocketClient {
                     // Process the message
                     match message {
                         WsMessage::Text(text) => {
-                        // Add debug logging for received messages
-                        #[cfg(feature = "tracing")]
-                        trace!("Received WebSocket message: {}", text);
+                            // Add debug logging for received messages
+                            #[cfg(feature = "tracing")]
+                            trace!("Received WebSocket message: {}", text);
 
-                        // Parse the response
-                        let response: Value = match serde_json::from_str(&text) {
-                            Ok(value) => value,
-                            Err(e) => {
-                                #[cfg(feature = "tracing")]
-                                debug!("JSON parse error: {}", e);
-                                return Some((Err(A2AError::JsonParse(e)), conn));
+                            // Parse the response
+                            let response: Value = match serde_json::from_str(&text) {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("JSON parse error: {}", e);
+                                    return Some((Err(A2AError::JsonParse(e)), conn));
+                                }
+                            };
+
+                            // Check for errors
+                            if let Some(error) = response.get("error") {
+                                if error.is_object() {
+                                    let response_clone = response.clone();
+                                    let error: JSONRPCResponse =
+                                        match serde_json::from_value(response_clone) {
+                                            Ok(resp) => resp,
+                                            Err(e) => {
+                                                return Some((Err(A2AError::JsonParse(e)), conn));
+                                            }
+                                        };
+
+                                    if let Some(err) = error.error {
+                                        return Some((
+                                            Err(A2AError::JsonRpc {
+                                                code: err.code,
+                                                message: err.message,
+                                                data: err.data,
+                                            }),
+                                            conn,
+                                        ));
+                                    }
+                                }
                             }
-                        };
 
-                        // Check for errors
-                        if let Some(error) = response.get("error") {
-                            if error.is_object() {
-                                let response_clone = response.clone();
-                                let error: JSONRPCResponse =
-                                    match serde_json::from_value(response_clone) {
-                                        Ok(resp) => resp,
-                                        Err(e) => {
-                                            return Some((Err(A2AError::JsonParse(e)), conn));
-                                        }
-                                    };
+                            // Check if it's a valid JSON-RPC message
+                            if response.get("jsonrpc").is_some() && response.get("result").is_some()
+                            {
+                                let result = response.get("result").cloned().unwrap_or(Value::Null);
 
-                                if let Some(err) = error.error {
+                                // If result is null, the task doesn't exist yet - keep streaming
+                                if result.is_null() {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Task doesn't exist yet, waiting for next message");
+                                    // Skip this message and wait for the next WebSocket message
+                                    continue; // Continue the loop to get the next message
+                                }
+
+                                // Try to parse as an initial Task response first
+                                if let Ok(task) = serde_json::from_value::<Task>(result.clone()) {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as Task");
+                                    return Some((Ok(StreamItem::Task(task)), conn));
+                                }
+
+                                // Try to parse as a status update
+                                if let Ok(status_update) =
+                                    serde_json::from_value::<TaskStatusUpdateEvent>(result.clone())
+                                {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as StatusUpdate");
                                     return Some((
-                                        Err(A2AError::JsonRpc {
-                                            code: err.code,
-                                            message: err.message,
-                                            data: err.data,
-                                        }),
+                                        Ok(StreamItem::StatusUpdate(status_update)),
+                                        conn,
+                                    ));
+                                }
+
+                                // Try to parse as an artifact update
+                                if let Ok(artifact_update) =
+                                    serde_json::from_value::<TaskArtifactUpdateEvent>(result)
+                                {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as ArtifactUpdate");
+                                    return Some((
+                                        Ok(StreamItem::ArtifactUpdate(artifact_update)),
                                         conn,
                                     ));
                                 }
                             }
+
+                            // If we got here, we couldn't parse the response
+                            #[cfg(feature = "tracing")]
+                            debug!("Failed to parse streaming response");
+                            return Some((
+                                Err(WebSocketClientError::Protocol(
+                                    "Failed to parse streaming response".to_string(),
+                                )
+                                .into()),
+                                conn,
+                            ));
                         }
-
-                        // Check if it's a valid JSON-RPC message
-                        if response.get("jsonrpc").is_some() && response.get("result").is_some() {
-                            let result = response.get("result").cloned().unwrap_or(Value::Null);
-
-                            // If result is null, the task doesn't exist yet - keep streaming
-                            if result.is_null() {
-                                #[cfg(feature = "tracing")]
-                                debug!("Task doesn't exist yet, waiting for next message");
-                                // Skip this message and wait for the next WebSocket message
-                                continue; // Continue the loop to get the next message
-                            }
-
-                            // Try to parse as an initial Task response first
-                            if let Ok(task) = serde_json::from_value::<Task>(result.clone()) {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as Task");
-                                return Some((Ok(StreamItem::Task(task)), conn));
-                            }
-
-                            // Try to parse as a status update
-                            if let Ok(status_update) =
-                                serde_json::from_value::<TaskStatusUpdateEvent>(result.clone())
-                            {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as StatusUpdate");
-                                return Some((Ok(StreamItem::StatusUpdate(status_update)), conn));
-                            }
-
-                            // Try to parse as an artifact update
-                            if let Ok(artifact_update) =
-                                serde_json::from_value::<TaskArtifactUpdateEvent>(result)
-                            {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as ArtifactUpdate");
-                                return Some((
-                                    Ok(StreamItem::ArtifactUpdate(artifact_update)),
-                                    conn,
-                                ));
-                            }
+                        _ => {
+                            return Some((
+                                Err(WebSocketClientError::Protocol(
+                                    "Unexpected WebSocket message type".to_string(),
+                                )
+                                .into()),
+                                conn,
+                            ));
                         }
-
-                        // If we got here, we couldn't parse the response
-                        #[cfg(feature = "tracing")]
-                        debug!("Failed to parse streaming response");
-                        return Some((Err(WebSocketClientError::Protocol(
-                            "Failed to parse streaming response".to_string(),
-                        )
-                        .into()), conn));
-                    }
-                    _ => {
-                        return Some((Err(WebSocketClientError::Protocol(
-                            "Unexpected WebSocket message type".to_string(),
-                        )
-                        .into()), conn));
-                    }
                     }; // End of match
                 } // End of loop
             })

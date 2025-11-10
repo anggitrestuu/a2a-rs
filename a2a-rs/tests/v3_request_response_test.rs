@@ -256,8 +256,14 @@ fn test_list_push_notification_configs_response_serialization() {
     assert!(response_json["result"].is_array());
     assert_eq!(response_json["result"].as_array().unwrap().len(), 2);
     assert_eq!(response_json["result"][0]["taskId"], "task-123");
-    assert_eq!(response_json["result"][0]["pushNotificationConfig"]["id"], "config-1");
-    assert_eq!(response_json["result"][1]["pushNotificationConfig"]["id"], "config-2");
+    assert_eq!(
+        response_json["result"][0]["pushNotificationConfig"]["id"],
+        "config-1"
+    );
+    assert_eq!(
+        response_json["result"][1]["pushNotificationConfig"]["id"],
+        "config-2"
+    );
 
     // Verify deserialization
     let deserialized: json_rpc::ListTaskPushNotificationConfigResponse =
@@ -287,14 +293,20 @@ fn test_get_push_notification_config_request_serialization() {
     assert_eq!(request_json["jsonrpc"], "2.0");
     assert_eq!(request_json["method"], "tasks/pushNotificationConfig/get");
     assert_eq!(request_json["params"]["id"], "task-456");
-    assert_eq!(request_json["params"]["pushNotificationConfigId"], "config-789");
+    assert_eq!(
+        request_json["params"]["pushNotificationConfigId"],
+        "config-789"
+    );
 
     // Verify deserialization
     let deserialized: json_rpc::GetTaskPushNotificationConfigRequest =
         serde_json::from_value(request_json).unwrap();
     let params = deserialized.params.unwrap();
     assert_eq!(params.id, "task-456");
-    assert_eq!(params.push_notification_config_id, Some("config-789".to_string()));
+    assert_eq!(
+        params.push_notification_config_id,
+        Some("config-789".to_string())
+    );
 }
 
 #[test]
@@ -317,15 +329,24 @@ fn test_delete_push_notification_config_request_serialization() {
     );
 
     assert_eq!(request_json["jsonrpc"], "2.0");
-    assert_eq!(request_json["method"], "tasks/pushNotificationConfig/delete");
+    assert_eq!(
+        request_json["method"],
+        "tasks/pushNotificationConfig/delete"
+    );
     assert_eq!(request_json["params"]["id"], "task-delete-123");
-    assert_eq!(request_json["params"]["pushNotificationConfigId"], "config-delete-456");
+    assert_eq!(
+        request_json["params"]["pushNotificationConfigId"],
+        "config-delete-456"
+    );
 
     // Verify deserialization
     let deserialized: json_rpc::DeleteTaskPushNotificationConfigRequest =
         serde_json::from_value(request_json).unwrap();
     assert_eq!(deserialized.params.id, "task-delete-123");
-    assert_eq!(deserialized.params.push_notification_config_id, "config-delete-456");
+    assert_eq!(
+        deserialized.params.push_notification_config_id,
+        "config-delete-456"
+    );
 }
 
 #[test]
@@ -428,7 +449,10 @@ fn test_push_notification_config_with_authentication() {
     assert!(config_json["authentication"]["schemes"].is_array());
     assert_eq!(config_json["authentication"]["schemes"][0], "bearer");
     assert_eq!(config_json["authentication"]["schemes"][1], "apiKey");
-    assert_eq!(config_json["authentication"]["credentials"], "secret-key-123");
+    assert_eq!(
+        config_json["authentication"]["credentials"],
+        "secret-key-123"
+    );
 
     // Verify deserialization
     let deserialized: PushNotificationConfig = serde_json::from_value(config_json).unwrap();
@@ -550,5 +574,8 @@ fn test_list_tasks_response_with_history() {
     // Verify history is included
     assert!(response_json["tasks"][0]["history"].is_array());
     let history = response_json["tasks"][0]["history"].as_array().unwrap();
-    assert!(history.len() >= 2, "Task should have at least 2 history entries");
+    assert!(
+        history.len() >= 2,
+        "Task should have at least 2 history entries"
+    );
 }
