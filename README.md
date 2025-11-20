@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/a2a-rs/badge.svg)](https://docs.rs/a2a-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive Rust implementation of the Agent-to-Agent (A2A) Protocol, providing both a robust framework library and practical agent examples. This project demonstrates production-ready agent communication with modern Rust practices and hexagonal architecture.
+A Rust implementation of the Agent-to-Agent (A2A) Protocol, providing both a robust framework library and practical agent examples. This project demonstrates production-ready agent communication with modern Rust practices and hexagonal architecture.
 
 ## 🎯 Quick Start - Try the Reimbursement Agent
 
@@ -23,6 +23,7 @@ cargo run --bin reimbursement_demo
 ```
 
 The reimbursement demo showcases:
+
 - 💬 **Interactive web interface** for submitting expenses
 - 📋 **Dynamic form generation** for expense submissions
 - ✅ **Request validation** and approval workflows
@@ -37,27 +38,35 @@ The reimbursement demo showcases:
 This repository contains a complete A2A ecosystem:
 
 ### 📦 [a2a-rs](./a2a-rs/) - Core Framework Library
+
 The main library published on [crates.io](https://crates.io/crates/a2a-rs):
-- 🚀 **Complete A2A Protocol Implementation** 
+
+- 🚀 **Complete A2A Protocol Implementation**
 - 🔄 **HTTP & WebSocket Support** with streaming
 - 🏛️ **Hexagonal Architecture** with clean separation
 - 🧩 **Modular Features** - use only what you need
 - 📚 **Comprehensive Documentation** with examples
 
 ### 🤖 [a2a-agents](./a2a-agents/) - Production Agent Examples
+
 Real-world agent implementations demonstrating best practices:
+
 - 💰 **Reimbursement Agent** - Handles expense requests with interactive workflows
 - 🔧 **Modern Architecture** using the a2a-rs framework
 - 📖 **Full Documentation** with setup guides
 
 ### 🔌 [a2a-mcp](./a2a-mcp/) - MCP Integration
+
 Bridges A2A agents with the Model Context Protocol ecosystem:
+
 - 🌉 **Bidirectional Integration** - A2A agents as MCP tools and vice versa
 - 🔗 **Protocol Translation** between A2A and MCP formats
 - 🛠️ **Developer Tools** for cross-protocol communication
 
 ### 💻 [a2a-client](./a2a-client/) - Web Interface
+
 Browser-based client for interacting with A2A agents:
+
 - 🌐 **Web UI** for agent communication
 - 💬 **Chat Interface** with real-time updates
 - 📱 **Responsive Design** for all devices
@@ -65,8 +74,9 @@ Browser-based client for interacting with A2A agents:
 ## ✨ Key Features
 
 ### 🎯 Framework Library (a2a-rs)
+
 - **Type-Safe Protocol** - Rust's type system ensures protocol compliance
-- **Async-First Design** - Built on Tokio with full async/await support  
+- **Async-First Design** - Built on Tokio with full async/await support
 - **Multiple Transports** - HTTP, WebSocket with automatic fallback
 - **Streaming Support** - Real-time task updates and progress tracking
 - **Authentication** - JWT, OAuth2, OpenID Connect, API keys
@@ -74,12 +84,14 @@ Browser-based client for interacting with A2A agents:
 - **Observability** - Structured logging and tracing throughout
 
 ### 🤖 Agent Examples
+
 - **Production Ready** - Complete implementations following best practices
 - **Interactive Workflows** - Dynamic form generation and multi-step processes
 - **Business Logic Examples** - Real use cases like expense reimbursement
 - **Framework Integration** - Shows how to use a2a-rs effectively
 
 ### 🔧 Developer Experience
+
 - **Comprehensive Documentation** - API docs, guides, and examples
 - **Working Examples** - Copy-paste code that actually works
 - **Test Coverage** - Integration tests and property-based testing
@@ -96,7 +108,7 @@ a2a-rs = "0.1.0"
 # For HTTP client
 a2a-rs = { version = "0.1.0", features = ["http-client"] }
 
-# For HTTP server  
+# For HTTP server
 a2a-rs = { version = "0.1.0", features = ["http-server"] }
 
 # Everything
@@ -112,10 +124,10 @@ use a2a_rs::port::AsyncA2AClient;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = HttpClient::new("http://localhost:3030".to_string());
-    
+
     let message = Message::user_text("I need to submit a $50 lunch expense".to_string());
     let task = client.send_task_message("task-123", &message, None, None).await?;
-    
+
     println!("Response: {:?}", task);
     Ok(())
 }
@@ -133,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         SimpleAgentInfo::new("my-agent".to_string(), "1.0.0".to_string()),
         "127.0.0.1:3030".to_string(),
     );
-    
+
     server.start().await?;
     Ok(())
 }
@@ -151,10 +163,10 @@ use futures::StreamExt;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = WebSocketClient::new("ws://localhost:3030/ws".to_string());
-    
+
     let message = Message::user_text("Process my reimbursement request".to_string());
     let mut stream = client.subscribe_to_task("task-456", &message, None, None).await?;
-    
+
     while let Some(result) = stream.next().await {
         match result? {
             StreamItem::Task(task) => println!("Initial task: {:?}", task),
@@ -167,7 +179,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -207,7 +219,7 @@ The project follows **hexagonal architecture** principles:
 ## 📚 Documentation
 
 - **[Core Library Docs](https://docs.rs/a2a-rs)** - Complete API documentation
-- **[Reimbursement Agent Guide](./a2a-agents/README.md)** - Building production agents  
+- **[Reimbursement Agent Guide](./a2a-agents/README.md)** - Building production agents
 - **[MCP Integration Guide](./a2a-mcp/README.md)** - Cross-protocol communication
 - **[Web Client Setup](./a2a-client/README.md)** - Browser-based interfaces
 
@@ -217,7 +229,7 @@ The project follows **hexagonal architecture** principles:
 # Test the core library
 cd a2a-rs && cargo test --all-features
 
-# Test agent examples  
+# Test agent examples
 cd a2a-agents && cargo test
 
 # Test MCP integration
@@ -230,7 +242,7 @@ cargo test --workspace
 ## 🛣️ Roadmap
 
 - [x] **Core Protocol** - Complete A2A specification implementation
-- [x] **Documentation** - Comprehensive docs and examples  
+- [x] **Documentation** - Comprehensive docs and examples
 - [x] **Agent Examples** - Production-ready reimbursement agent
 - [x] **MCP Integration** - Cross-protocol compatibility
 - [ ] **More Agent Types** - Additional domain examples
