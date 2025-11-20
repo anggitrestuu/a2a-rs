@@ -8,26 +8,29 @@ A comprehensive Rust implementation of the Agent-to-Agent (A2A) Protocol, provid
 
 ## 🎯 Quick Start - Try the Reimbursement Agent
 
-See the A2A protocol in action with our **reimbursement agent** - a complete example that handles expense reimbursement requests:
+See the A2A protocol in action with our **reimbursement agent demo** - a complete, self-contained example with both agent backend and interactive web frontend:
 
 ```bash
 # Clone the repository
 git clone https://github.com/emillindfors/a2a-rs.git
 cd a2a-rs
 
-# Run the reimbursement agent
+# Run the complete demo (agent + web UI)
 cd a2a-agents
-cargo run --bin reimbursement_server
+cargo run --bin reimbursement_demo
+
+# Open your browser to http://localhost:3000
 ```
 
-The reimbursement agent showcases:
-- 💬 **Interactive conversations** with users about expenses
-- 📋 **Dynamic form generation** for expense submissions  
+The reimbursement demo showcases:
+- 💬 **Interactive web interface** for submitting expenses
+- 📋 **Dynamic form generation** for expense submissions
 - ✅ **Request validation** and approval workflows
-- 📊 **Structured responses** with proper task state management
-- 🔄 **Real-time updates** via the A2A protocol
+- 📊 **Real-time task updates** with streaming
+- 🔄 **Complete A2A protocol** implementation (HTTP + WebSocket)
+- 🌐 **Production-ready architecture** with frontend and backend
 
-**Try it out**: Send a POST request to `http://localhost:3030/sendMessage` with a reimbursement question!
+**Try it out**: Open `http://localhost:3000` and submit an expense reimbursement request!
 
 ## 🏗️ Project Structure
 

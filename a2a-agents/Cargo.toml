@@ -58,13 +58,8 @@ auth = ["a2a-rs/auth"]
 
 
 [[bin]]
-name = "reimbursement_server"
-path = "bin/reimbursement_server.rs"
-required-features = ["reimbursement-agent"]
-
-[[bin]]
-name = "reimbursement_frontend"
-path = "bin/frontend.rs"
+name = "reimbursement_demo"
+path = "bin/reimbursement_demo.rs"
 required-features = ["reimbursement-agent"]
 
 [[example]]

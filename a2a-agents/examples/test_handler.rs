@@ -1,6 +1,7 @@
 use a2a_agents::reimbursement_agent::handler::ReimbursementHandler;
 use a2a_rs::domain::{Message, Part, Role};
 use a2a_rs::port::message_handler::AsyncMessageHandler;
+use a2a_rs::adapter::storage::InMemoryTaskStorage;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -9,8 +10,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logging
     tracing_subscriber::fmt().with_env_filter("debug").init();
 
-    // Create handler
-    let handler = ReimbursementHandler::new();
+    // Create handler with in-memory task storage
+    let task_storage = InMemoryTaskStorage::new();
+    let handler = ReimbursementHandler::new(task_storage);
 
     println!("=== Testing Reimbursement Handler ===\n");
 

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use a2a_agents::reimbursement_agent::handler::ReimbursementHandler;
 use a2a_rs::domain::{Message, Part, Role};
 use a2a_rs::port::message_handler::AsyncMessageHandler;
+use a2a_rs::adapter::storage::InMemoryTaskStorage;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,8 +16,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_line_number(true)
         .init();
 
-    // Initialize the handler
-    let handler = ReimbursementHandler::new();
+    // Initialize the handler with in-memory task storage
+    let task_storage = InMemoryTaskStorage::new();
+    let handler = ReimbursementHandler::new(task_storage);
 
     println!("=== Testing Metrics and Logging ===\n");
 
