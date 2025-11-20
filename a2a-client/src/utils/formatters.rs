@@ -22,18 +22,18 @@ pub fn format_task_state(state: &TaskState) -> String {
 pub fn format_message_content(parts: &[Part]) -> String {
     parts
         .iter()
-        .filter_map(|part| match part {
-            Part::Text { text, .. } => Some(text.clone()),
-            Part::File { file, .. } => Some(format!(
+        .map(|part| match part {
+            Part::Text { text, .. } => text.clone(),
+            Part::File { file, .. } => format!(
                 "[File: {}]",
                 file.name.as_ref().unwrap_or(&"unnamed".to_string())
-            )),
+            ),
             Part::Data { data, .. } => {
                 let name = data
                     .get("name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unnamed");
-                Some(format!("[Data: {}]", name))
+                format!("[Data: {}]", name)
             }
         })
         .collect::<Vec<_>>()

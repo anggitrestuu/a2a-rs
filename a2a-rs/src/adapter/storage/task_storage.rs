@@ -21,8 +21,8 @@ use crate::domain::{
     TaskState, TaskStatus, TaskStatusUpdateEvent,
 };
 use crate::port::{
-    streaming_handler::Subscriber, AsyncNotificationManager, AsyncStreamingHandler,
-    AsyncTaskManager,
+    AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager,
+    streaming_handler::Subscriber,
 };
 
 type StatusSubscribers = Vec<Box<dyn Subscriber<TaskStatusUpdateEvent> + Send + Sync>>;
@@ -60,7 +60,7 @@ impl InMemoryTaskStorage {
         #[cfg(feature = "http-client")]
         let push_sender = HttpPushNotificationSender::new();
         #[cfg(not(feature = "http-client"))]
-        let push_sender = NoopPushNotificationSender::default();
+        let push_sender = NoopPushNotificationSender;
 
         let push_registry = PushNotificationRegistry::new(push_sender);
 
@@ -310,12 +310,12 @@ impl AsyncTaskManager for InMemoryTaskStorage {
         let task = {
             let tasks_guard = self.tasks.lock().await;
 
-            if let Some(task) = tasks_guard.get(task_id) {
-                // Apply history length limitation if specified
-                task.with_limited_history(history_length)
-            } else {
+            let Some(task) = tasks_guard.get(task_id) else {
                 return Err(A2AError::TaskNotFound(task_id.to_string()));
-            }
+            };
+
+            // Apply history length limitation if specified
+            task.with_limited_history(history_length)
         }; // Lock is dropped here
 
         Ok(task)
@@ -326,40 +326,40 @@ impl AsyncTaskManager for InMemoryTaskStorage {
         let task = {
             let mut tasks_guard = self.tasks.lock().await;
 
-            if let Some(task) = tasks_guard.get(task_id) {
-                let mut updated_task = task.clone();
-
-                // Only working tasks can be canceled
-                if updated_task.status.state != TaskState::Working {
-                    return Err(A2AError::TaskNotCancelable(format!(
-                        "Task {} is in state {:?} and cannot be canceled",
-                        task_id, updated_task.status.state
-                    )));
-                }
-
-                // Create a cancellation message to add to history
-                let cancel_message = Message {
-                    role: crate::domain::Role::Agent,
-                    parts: vec![crate::domain::Part::Text {
-                        text: format!("Task {} canceled.", task_id),
-                        metadata: None,
-                    }],
-                    metadata: None,
-                    reference_task_ids: None,
-                    message_id: uuid::Uuid::new_v4().to_string(),
-                    task_id: Some(task_id.to_string()),
-                    context_id: Some(updated_task.context_id.clone()),
-                    extensions: None,
-                    kind: "message".to_string(),
-                };
-
-                // Update the status with the cancellation message to track in history
-                updated_task.update_status(TaskState::Canceled, Some(cancel_message));
-                tasks_guard.insert(task_id.to_string(), updated_task.clone());
-                updated_task
-            } else {
+            let Some(task) = tasks_guard.get(task_id) else {
                 return Err(A2AError::TaskNotFound(task_id.to_string()));
+            };
+
+            let mut updated_task = task.clone();
+
+            // Only working tasks can be canceled
+            if updated_task.status.state != TaskState::Working {
+                return Err(A2AError::TaskNotCancelable(format!(
+                    "Task {} is in state {:?} and cannot be canceled",
+                    task_id, updated_task.status.state
+                )));
             }
+
+            // Create a cancellation message to add to history
+            let cancel_message = Message {
+                role: crate::domain::Role::Agent,
+                parts: vec![crate::domain::Part::Text {
+                    text: format!("Task {} canceled.", task_id),
+                    metadata: None,
+                }],
+                metadata: None,
+                reference_task_ids: None,
+                message_id: uuid::Uuid::new_v4().to_string(),
+                task_id: Some(task_id.to_string()),
+                context_id: Some(updated_task.context_id.clone()),
+                extensions: None,
+                kind: "message".to_string(),
+            };
+
+            // Update the status with the cancellation message to track in history
+            updated_task.update_status(TaskState::Canceled, Some(cancel_message));
+            tasks_guard.insert(task_id.to_string(), updated_task.clone());
+            updated_task
         }; // Lock is dropped here
 
         // Broadcast status update (with final flag set to true)

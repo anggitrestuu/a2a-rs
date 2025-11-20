@@ -51,18 +51,18 @@ impl MessageView {
         let content = msg
             .parts
             .iter()
-            .filter_map(|part| match part {
-                MessagePart::Text { text, .. } => Some(text.clone()),
-                MessagePart::File { file, .. } => Some(format!(
+            .map(|part| match part {
+                MessagePart::Text { text, .. } => text.clone(),
+                MessagePart::File { file, .. } => format!(
                     "[File: {}]",
                     file.name.as_ref().unwrap_or(&"unnamed".to_string())
-                )),
+                ),
                 MessagePart::Data { data, .. } => {
                     let name = data
                         .get("name")
                         .and_then(|v| v.as_str())
                         .unwrap_or("unnamed");
-                    Some(format!("[Data: {}]", name))
+                    format!("[Data: {}]", name)
                 }
             })
             .collect::<Vec<_>>()

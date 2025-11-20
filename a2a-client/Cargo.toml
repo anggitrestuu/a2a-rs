@@ -1,7 +1,8 @@
 [package]
 name = "a2a-client"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+rust-version = "1.85"
 authors = ["Emil Lindfors <emil@lindfors.no>"]
 description = "Generic web client library for building A2A agent frontends"
 license = "MIT"

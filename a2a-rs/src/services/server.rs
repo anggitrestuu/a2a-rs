@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    application::{json_rpc::A2ARequest, JSONRPCResponse},
+    application::{JSONRPCResponse, json_rpc::A2ARequest},
     domain::{A2AError, AgentCard, AgentSkill},
 };
 

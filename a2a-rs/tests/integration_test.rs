@@ -85,9 +85,11 @@ async fn test_http_client_server_interaction() {
 
     let agent_card: Value = response.json().await.expect("Failed to parse agent card");
     assert_eq!(agent_card["name"].as_str().unwrap(), "Test Agent");
-    assert!(agent_card["capabilities"]["stateTransitionHistory"]
-        .as_bool()
-        .unwrap());
+    assert!(
+        agent_card["capabilities"]["stateTransitionHistory"]
+            .as_bool()
+            .unwrap()
+    );
     assert!(!agent_card["capabilities"]["streaming"].as_bool().unwrap());
 
     // Test 2: Get skills using direct HTTP request

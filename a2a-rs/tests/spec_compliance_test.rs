@@ -6,14 +6,14 @@
 mod common;
 
 use a2a_rs::{
+    MessageSendParams,
     adapter::SimpleAgentInfo,
     application::SendMessageRequest,
     domain::{Message, Part, Task, TaskState},
     services::AgentInfoProvider,
-    MessageSendParams,
 };
 use jsonschema::{Draft, Validator};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 
 /// Load and compile a JSON Schema from the spec directory
@@ -596,7 +596,7 @@ fn test_artifact_extensions_field() {
         }],
         metadata: None,
         extensions: Some(vec![
-            "https://example.com/extensions/artifact-encryption".to_string()
+            "https://example.com/extensions/artifact-encryption".to_string(),
         ]),
     };
 

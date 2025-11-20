@@ -1,19 +1,18 @@
 use a2a_client::{
-    components::{create_sse_stream, MessageView, TaskView},
     WebA2AClient,
+    components::{MessageView, TaskView, create_sse_stream},
 };
 use a2a_rs::{
     domain::{ListTasksParams, TaskState, TaskStatusUpdateEvent},
     services::AsyncA2AClient,
 };
-use anyhow;
 use askama::Template;
 use askama_axum::IntoResponse;
 use axum::{
+    Form, Router,
     extract::{Multipart, Path, Query, State},
     response::Response as AxumResponse,
     routing::{get, post},
-    Form, Router,
 };
 use serde::Deserialize;
 use std::{net::SocketAddr, sync::Arc};

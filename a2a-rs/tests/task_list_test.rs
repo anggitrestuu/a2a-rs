@@ -364,7 +364,7 @@ async fn test_task_list_page_size_clamping() {
 #[tokio::test]
 async fn test_task_list_history_length() {
     let port = 9006;
-    let (shutdown_tx, storage) = setup_server_with_tasks(port).await;
+    let (shutdown_tx, _storage) = setup_server_with_tasks(port).await;
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
@@ -483,7 +483,7 @@ async fn test_task_list_include_artifacts() {
         .await
         .expect("Failed to list tasks");
 
-    let task = result
+    let _task = result
         .tasks
         .iter()
         .find(|t| t.id == task_id)
@@ -504,7 +504,7 @@ async fn test_task_list_include_artifacts() {
         .await
         .expect("Failed to list tasks");
 
-    let task = result
+    let _task = result
         .tasks
         .iter()
         .find(|t| t.id == task_id)
@@ -527,7 +527,7 @@ async fn test_task_list_combined_filters() {
 
     // Create multiple tasks in same context (using session_id)
     let task_ids: Vec<String> = (0..5)
-        .map(|i| format!("combined-task-{}", uuid::Uuid::new_v4()))
+        .map(|_i| format!("combined-task-{}", uuid::Uuid::new_v4()))
         .collect();
 
     for task_id in &task_ids {

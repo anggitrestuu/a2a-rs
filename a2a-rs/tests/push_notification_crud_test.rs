@@ -377,10 +377,12 @@ async fn test_push_notification_config_with_authentication() {
     assert_eq!(configs.len(), 1);
 
     let returned_config = &configs[0];
-    assert!(returned_config
-        .push_notification_config
-        .authentication
-        .is_some());
+    assert!(
+        returned_config
+            .push_notification_config
+            .authentication
+            .is_some()
+    );
 
     let auth = returned_config
         .push_notification_config

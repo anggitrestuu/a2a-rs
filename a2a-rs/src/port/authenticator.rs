@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::domain::{core::agent::SecurityScheme, A2AError};
+use crate::domain::{A2AError, core::agent::SecurityScheme};
 
 /// Authentication context containing credentials and metadata
 #[derive(Debug, Clone)]
@@ -105,7 +105,7 @@ pub trait AuthContextExtractor: Send + Sync {
 pub trait CompositeAuthenticator: Send + Sync {
     /// Try to authenticate using any available scheme
     async fn authenticate_any(&self, contexts: Vec<AuthContext>)
-        -> Result<AuthPrincipal, A2AError>;
+    -> Result<AuthPrincipal, A2AError>;
 
     /// Get all supported security schemes
     fn supported_schemes(&self) -> Vec<&SecurityScheme>;

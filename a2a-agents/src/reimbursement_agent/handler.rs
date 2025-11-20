@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::Deserialize;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error, info, instrument, warn};
@@ -85,6 +85,7 @@ where
 {
     task_manager: T,
     validation_rules: ValidationRules,
+    #[allow(dead_code)]
     file_metadata_store: Arc<Mutex<HashMap<String, Map<String, Value>>>>,
     metrics: Arc<Mutex<HandlerMetrics>>,
     ai_client: Option<AiClient>,
@@ -400,16 +401,21 @@ Example response when asking for info:
             #[serde(default)]
             needs_clarification: Vec<String>,
             #[serde(default)]
+            #[allow(dead_code)]
             approval_reason: Option<String>,
         }
 
         #[derive(Debug, Deserialize)]
         struct ExtractedData {
+            #[allow(dead_code)]
             date: Option<String>,
             amount: Option<f64>,
             currency: Option<String>,
+            #[allow(dead_code)]
             purpose: Option<String>,
+            #[allow(dead_code)]
             category: Option<String>,
+            #[allow(dead_code)]
             has_receipt: Option<bool>,
         }
 
@@ -591,24 +597,19 @@ Example response when asking for info:
                 .and_then(|v| serde_json::from_value::<ExpenseCategory>(v.clone()).ok())
                 .or_else(|| {
                     // Try category_hint from metadata
-                    data.get("category_hint")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| {
-                            serde_json::from_value::<ExpenseCategory>(Value::String(s.to_string()))
-                                .ok()
-                        })
+                    let hint = data.get("category_hint")?.as_str()?;
+                    serde_json::from_value::<ExpenseCategory>(Value::String(hint.to_string())).ok()
                 })
                 .or_else(|| {
                     // Try expense_type from metadata
-                    data.get("expense_type").and_then(|v| v.as_str()).map(|s| {
-                        match s.to_lowercase().as_str() {
-                            "travel" => ExpenseCategory::Travel,
-                            "meals" | "meal" => ExpenseCategory::Meals,
-                            "supplies" | "supply" => ExpenseCategory::Supplies,
-                            "equipment" => ExpenseCategory::Equipment,
-                            "training" => ExpenseCategory::Training,
-                            _ => ExpenseCategory::Other,
-                        }
+                    let expense_type = data.get("expense_type")?.as_str()?;
+                    Some(match expense_type.to_lowercase().as_str() {
+                        "travel" => ExpenseCategory::Travel,
+                        "meals" | "meal" => ExpenseCategory::Meals,
+                        "supplies" | "supply" => ExpenseCategory::Supplies,
+                        "equipment" => ExpenseCategory::Equipment,
+                        "training" => ExpenseCategory::Training,
+                        _ => ExpenseCategory::Other,
                     })
                 });
 
@@ -624,24 +625,24 @@ Example response when asking for info:
                     .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
             };
 
-            if let Some(request_id) = request_id {
-                // Form submission with request_id
-                if let (Some(date), Some(amount), Some(purpose), Some(category)) = (
+            if let Some(request_id) = request_id
+                && let (Some(date), Some(amount), Some(purpose), Some(category)) = (
                     date.clone(),
                     amount.clone(),
                     purpose.clone(),
                     category.clone(),
-                ) {
-                    return Ok(ReimbursementRequest::FormSubmission {
-                        request_id: request_id.to_string(),
-                        date,
-                        amount,
-                        purpose,
-                        category,
-                        receipt_files,
-                        notes,
-                    });
-                }
+                )
+            {
+                // Form submission with request_id
+                return Ok(ReimbursementRequest::FormSubmission {
+                    request_id: request_id.to_string(),
+                    date,
+                    amount,
+                    purpose,
+                    category,
+                    receipt_files,
+                    notes,
+                });
             } else {
                 // Initial request without request_id
                 return Ok(ReimbursementRequest::Initial {
@@ -711,14 +712,15 @@ Example response when asking for info:
         let lower_text = text.to_lowercase();
 
         // Check if it's a status query
-        if lower_text.contains("status") && text.contains("req_") {
-            if let Some(start) = text.find("req_") {
-                let request_id: String = text[start..]
-                    .chars()
-                    .take_while(|c| c.is_alphanumeric() || *c == '_')
-                    .collect();
-                return Ok(ReimbursementRequest::StatusQuery { request_id });
-            }
+        if lower_text.contains("status")
+            && text.contains("req_")
+            && let Some(start) = text.find("req_")
+        {
+            let request_id: String = text[start..]
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            return Ok(ReimbursementRequest::StatusQuery { request_id });
         }
 
         // Parse as initial request
@@ -934,10 +936,10 @@ Example response when asking for info:
                         return Ok(ReimbursementResponse::Result {
                             request_id: request_id.clone(),
                             status: ProcessingStatus::Approved,
-                            message: Some(
-                                format!("✅ Your expense of {} has been automatically approved! No further action needed.",
-                                    amount.as_ref().unwrap().to_formatted_string())
-                            ),
+                            message: Some(format!(
+                                "✅ Your expense of {} has been automatically approved! No further action needed.",
+                                amount.as_ref().unwrap().to_formatted_string()
+                            )),
                             details: Some(details),
                         });
                     }
@@ -985,7 +987,7 @@ Example response when asking for info:
                 // Store the request
                 // Process receipt files with metadata
                 let mut receipts = vec![];
-                if let Some(ref files) = receipt_files {
+                if let Some(files) = receipt_files {
                     for file_id in files {
                         if let Some(metadata) = self.get_file_metadata(file_id) {
                             receipts.push(ReceiptMetadata {
@@ -1015,10 +1017,7 @@ Example response when asking for info:
                 // Check for auto-approval based on amount
                 // In a real system, we'd get this from the message metadata or business rules
                 // For now, we'll auto-approve small amounts
-                let auto_approve = match &amount {
-                    Money::Number { amount, .. } if *amount < 100.0 => true,
-                    _ => false,
-                };
+                let auto_approve = matches!(amount, Money::Number { amount, .. } if *amount < 100.0);
 
                 let status = if auto_approve {
                     ProcessingStatus::Approved

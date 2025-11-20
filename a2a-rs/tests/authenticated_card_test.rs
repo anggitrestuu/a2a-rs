@@ -161,12 +161,16 @@ async fn test_authenticated_card_vs_regular_card() {
     assert_eq!(regular_card.protocol_version, auth_card.protocol_version);
 
     // Both should indicate support for authenticated extended card
-    assert!(regular_card
-        .supports_authenticated_extended_card
-        .unwrap_or(false));
-    assert!(auth_card
-        .supports_authenticated_extended_card
-        .unwrap_or(false));
+    assert!(
+        regular_card
+            .supports_authenticated_extended_card
+            .unwrap_or(false)
+    );
+    assert!(
+        auth_card
+            .supports_authenticated_extended_card
+            .unwrap_or(false)
+    );
 
     shutdown_tx.send(()).ok();
 }

@@ -5,8 +5,8 @@
 use async_trait::async_trait;
 use futures::stream::Stream;
 use reqwest::{
-    header::{HeaderMap, HeaderValue, CONTENT_TYPE},
     Client,
+    header::{CONTENT_TYPE, HeaderMap, HeaderValue},
 };
 use std::{pin::Pin, time::Duration};
 
@@ -16,8 +16,8 @@ use tracing::{debug, error, instrument};
 use crate::{
     adapter::error::HttpClientError,
     application::{
-        json_rpc::{self, A2ARequest, SendTaskRequest},
         JSONRPCResponse,
+        json_rpc::{self, A2ARequest, SendTaskRequest},
     },
     domain::{
         A2AError, ListTasksParams, ListTasksResult, Message, Task, TaskIdParams,

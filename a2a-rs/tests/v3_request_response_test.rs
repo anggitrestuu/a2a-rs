@@ -14,7 +14,7 @@ use a2a_rs::{
         TaskPushNotificationConfig, TaskState,
     },
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[test]
 fn test_list_tasks_request_serialization() {
@@ -75,7 +75,7 @@ fn test_list_tasks_request_minimal() {
 
     assert_eq!(request_json["jsonrpc"], "2.0");
     assert_eq!(request_json["method"], "tasks/list");
-    assert!(request_json["params"].is_null() || !request_json.get("params").is_some());
+    assert!(request_json["params"].is_null() || request_json.get("params").is_none());
 }
 
 #[test]
@@ -377,7 +377,7 @@ fn test_jsonrpc_error_response_serialization() {
 
     assert_eq!(response_json["jsonrpc"], "2.0");
     assert_eq!(response_json["id"], "req-error");
-    assert!(response_json["result"].is_null() || !response_json.get("result").is_some());
+    assert!(response_json["result"].is_null() || response_json.get("result").is_none());
     assert_eq!(response_json["error"]["code"], -32001);
     assert_eq!(response_json["error"]["message"], "Task not found");
     assert_eq!(response_json["error"]["data"]["taskId"], "task-missing-123");
@@ -463,8 +463,7 @@ fn test_push_notification_config_with_authentication() {
 #[test]
 fn test_task_status_serialization_all_states() {
     // Test serialization of all task states
-    let states = vec![
-        TaskState::Submitted,
+    let states = [TaskState::Submitted,
         TaskState::Working,
         TaskState::InputRequired,
         TaskState::Completed,
@@ -472,11 +471,9 @@ fn test_task_status_serialization_all_states() {
         TaskState::Failed,
         TaskState::Rejected,
         TaskState::AuthRequired,
-        TaskState::Unknown,
-    ];
+        TaskState::Unknown];
 
-    let expected_strings = vec![
-        "submitted",
+    let expected_strings = ["submitted",
         "working",
         "input-required",
         "completed",
@@ -484,8 +481,7 @@ fn test_task_status_serialization_all_states() {
         "failed",
         "rejected",
         "auth-required",
-        "unknown",
-    ];
+        "unknown"];
 
     for (state, expected) in states.iter().zip(expected_strings.iter()) {
         let state_json = serde_json::to_value(state).unwrap();

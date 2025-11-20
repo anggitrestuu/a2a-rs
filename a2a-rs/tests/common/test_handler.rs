@@ -14,9 +14,9 @@ use a2a_rs::{
         TaskStatusUpdateEvent,
     },
     port::{
-        streaming_handler::Subscriber, AsyncMessageHandler, AsyncNotificationManager,
-        AsyncStreamingHandler, AsyncTaskManager, MessageHandler, NotificationManager,
-        StreamingHandler, TaskManager,
+        AsyncMessageHandler, AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager,
+        MessageHandler, NotificationManager, StreamingHandler, TaskManager,
+        streaming_handler::Subscriber,
     },
 };
 

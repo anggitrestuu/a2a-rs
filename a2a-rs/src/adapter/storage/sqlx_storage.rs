@@ -32,8 +32,8 @@ use crate::domain::{
 };
 #[cfg(feature = "sqlx-storage")]
 use crate::port::{
-    streaming_handler::Subscriber, AsyncNotificationManager, AsyncStreamingHandler,
-    AsyncTaskManager,
+    AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager,
+    streaming_handler::Subscriber,
 };
 
 #[cfg(feature = "sqlx-storage")]
@@ -649,12 +649,12 @@ impl AsyncTaskManager for SqlxTaskStorage {
 
         // Filter by context_id
         if params.context_id.is_some() {
-            where_conditions.push(format!("context_id = ?"));
+            where_conditions.push("context_id = ?".to_string());
         }
 
         // Filter by status
         if params.status.is_some() {
-            where_conditions.push(format!("status_state = ?"));
+            where_conditions.push("status_state = ?".to_string());
         }
 
         // Filter by lastUpdatedAfter
@@ -662,7 +662,7 @@ impl AsyncTaskManager for SqlxTaskStorage {
             // Convert milliseconds to SQLite timestamp
             let timestamp = chrono::DateTime::from_timestamp_millis(last_updated_after)
                 .unwrap_or(chrono::Utc::now());
-            where_conditions.push(format!("updated_at > ?"));
+            where_conditions.push("updated_at > ?".to_string());
             Some(timestamp.format("%Y-%m-%d %H:%M:%S").to_string())
         } else {
             None

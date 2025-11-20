@@ -1,14 +1,14 @@
 //! JWT authentication implementation using jsonwebtoken crate
 
 #[cfg(feature = "auth")]
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use async_trait::async_trait;
 
 use crate::{
-    domain::{core::agent::SecurityScheme, A2AError},
+    domain::{A2AError, core::agent::SecurityScheme},
     port::authenticator::{AuthContext, AuthContextExtractor, AuthPrincipal, Authenticator},
 };
 

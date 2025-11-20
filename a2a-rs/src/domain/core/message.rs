@@ -354,18 +354,9 @@ impl PartBuilder {
     /// Add metadata to any part type
     pub fn with_metadata(mut self, metadata: Map<String, Value>) -> Self {
         match &mut self.part {
-            Part::Text {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
-            Part::Data {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
-            Part::File {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
+            Part::Text { metadata: meta, .. } => *meta = Some(metadata),
+            Part::Data { metadata: meta, .. } => *meta = Some(metadata),
+            Part::File { metadata: meta, .. } => *meta = Some(metadata),
         }
         self
     }

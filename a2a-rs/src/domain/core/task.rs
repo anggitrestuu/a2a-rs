@@ -480,7 +480,7 @@ impl Task {
         }
 
         // Validate message IDs are unique if history exists
-        if let Some(ref hist) = &self.history {
+        if let Some(hist) = &self.history {
             #[cfg(feature = "tracing")]
             tracing::trace!("Checking for duplicate message IDs in history");
 
@@ -498,7 +498,7 @@ impl Task {
         }
 
         // Validate all messages in history
-        if let Some(ref hist) = &self.history {
+        if let Some(hist) = &self.history {
             #[cfg(feature = "tracing")]
             tracing::trace!("Validating {} messages in history", hist.len());
 
@@ -510,7 +510,7 @@ impl Task {
         }
 
         // Validate status message if present
-        if let Some(ref msg) = &self.status.message {
+        if let Some(msg) = &self.status.message {
             #[cfg(feature = "tracing")]
             tracing::trace!("Validating status message");
             msg.validate()?;

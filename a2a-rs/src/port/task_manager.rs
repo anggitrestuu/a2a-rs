@@ -4,12 +4,12 @@
 use async_trait::async_trait;
 
 use crate::{
+    Message,
     domain::{
         A2AError, DeleteTaskPushNotificationConfigParams, GetTaskPushNotificationConfigParams,
         ListTaskPushNotificationConfigParams, ListTasksParams, ListTasksResult, Task, TaskIdParams,
         TaskPushNotificationConfig, TaskQueryParams, TaskState,
     },
-    Message,
 };
 
 /// A trait for managing task lifecycle and operations

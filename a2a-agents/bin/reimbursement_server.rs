@@ -40,7 +40,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load configuration
     let mut config = if let Some(config_path) = args.config {
         println!("📄 Loading config from: {}", config_path);
-        std::env::set_var("CONFIG_FILE", config_path);
+        // SAFETY: We're in single-threaded initialization, before any other threads
+        // could be reading environment variables
+        unsafe {
+            std::env::set_var("CONFIG_FILE", config_path);
+        }
         ServerConfig::load()?
     } else {
         ServerConfig::from_env()

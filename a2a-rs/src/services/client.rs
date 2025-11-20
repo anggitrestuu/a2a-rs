@@ -5,7 +5,7 @@ use futures::Stream;
 use std::pin::Pin;
 
 use crate::{
-    application::{json_rpc::A2ARequest, JSONRPCResponse},
+    application::{JSONRPCResponse, json_rpc::A2ARequest},
     domain::{
         A2AError, ListTasksParams, ListTasksResult, Message, Task, TaskArtifactUpdateEvent,
         TaskPushNotificationConfig, TaskStatusUpdateEvent,

@@ -2,12 +2,12 @@
 
 #[cfg(feature = "auth")]
 use oauth2::{
-    basic::BasicClient, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl,
+    AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl, basic::BasicClient,
 };
 #[cfg(feature = "auth")]
 use openidconnect::{
-    core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata},
     IssuerUrl, Nonce,
+    core::{CoreAuthenticationFlow, CoreClient, CoreProviderMetadata},
 };
 
 use async_trait::async_trait;
@@ -16,10 +16,10 @@ use std::collections::HashMap;
 
 use crate::{
     domain::{
+        A2AError,
         core::agent::{
             AuthorizationCodeOAuthFlow, ClientCredentialsOAuthFlow, OAuthFlows, SecurityScheme,
         },
-        A2AError,
     },
     port::authenticator::{AuthContext, AuthContextExtractor, AuthPrincipal, Authenticator},
 };

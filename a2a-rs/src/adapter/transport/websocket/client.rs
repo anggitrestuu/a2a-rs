@@ -4,8 +4,8 @@
 
 use async_trait::async_trait;
 use futures::{
-    stream::{Stream, StreamExt},
     SinkExt,
+    stream::{Stream, StreamExt},
 };
 use serde_json::Value;
 use std::{pin::Pin, sync::Arc, time::Duration};
@@ -14,7 +14,7 @@ use tokio::{
     sync::Mutex, // Changed to tokio::sync::Mutex
 };
 use tokio_tungstenite::{
-    connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream, WebSocketStream,
+    MaybeTlsStream, WebSocketStream, connect_async, tungstenite::protocol::Message as WsMessage,
 };
 use url::Url;
 
@@ -24,8 +24,8 @@ use tracing::{debug, trace};
 use crate::{
     adapter::error::WebSocketClientError,
     application::{
-        json_rpc::{self, A2ARequest, SendTaskRequest, TaskResubscriptionRequest},
         JSONRPCResponse,
+        json_rpc::{self, A2ARequest, SendTaskRequest, TaskResubscriptionRequest},
     },
     domain::{
         A2AError, Message, Task, TaskArtifactUpdateEvent, TaskIdParams, TaskPushNotificationConfig,
@@ -214,23 +214,19 @@ impl AsyncA2AClient for WebSocketClient {
         let request = json_rpc::GetTaskRequest::new(params);
         let response = self.send_request(&A2ARequest::GetTask(request)).await?;
 
-        match response.result {
-            Some(value) => {
-                let task: Task = serde_json::from_value(value)?;
-                Ok(task)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let task: Task = serde_json::from_value(value)?;
+        Ok(task)
     }
 
     async fn cancel_task<'a>(&self, task_id: &'a str) -> Result<Task, A2AError> {
@@ -242,23 +238,19 @@ impl AsyncA2AClient for WebSocketClient {
         let request = json_rpc::CancelTaskRequest::new(params);
         let response = self.send_request(&A2ARequest::CancelTask(request)).await?;
 
-        match response.result {
-            Some(value) => {
-                let task: Task = serde_json::from_value(value)?;
-                Ok(task)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let task: Task = serde_json::from_value(value)?;
+        Ok(task)
     }
 
     async fn set_task_push_notification<'a>(
@@ -270,23 +262,19 @@ impl AsyncA2AClient for WebSocketClient {
             .send_request(&A2ARequest::SetTaskPushNotification(request))
             .await?;
 
-        match response.result {
-            Some(value) => {
-                let config: TaskPushNotificationConfig = serde_json::from_value(value)?;
-                Ok(config)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let config: TaskPushNotificationConfig = serde_json::from_value(value)?;
+        Ok(config)
     }
 
     async fn get_task_push_notification<'a>(
@@ -497,7 +485,7 @@ impl AsyncA2AClient for WebSocketClient {
                         let mut guard = conn.lock().await;
                         guard.next().await
                     }; // Lock is dropped here
-                       // Process result outside the lock scope
+                    // Process result outside the lock scope
                     let message = match message_result {
                         Some(Ok(msg)) => msg,
                         Some(Err(e)) => {
@@ -533,27 +521,27 @@ impl AsyncA2AClient for WebSocketClient {
                             };
 
                             // Check for errors
-                            if let Some(error) = response.get("error") {
-                                if error.is_object() {
-                                    let response_clone = response.clone();
-                                    let error: JSONRPCResponse =
-                                        match serde_json::from_value(response_clone) {
-                                            Ok(resp) => resp,
-                                            Err(e) => {
-                                                return Some((Err(A2AError::JsonParse(e)), conn));
-                                            }
-                                        };
+                            if let Some(error) = response.get("error")
+                                && error.is_object()
+                            {
+                                let response_clone = response.clone();
+                                let error: JSONRPCResponse =
+                                    match serde_json::from_value(response_clone) {
+                                        Ok(resp) => resp,
+                                        Err(e) => {
+                                            return Some((Err(A2AError::JsonParse(e)), conn));
+                                        }
+                                    };
 
-                                    if let Some(err) = error.error {
-                                        return Some((
-                                            Err(A2AError::JsonRpc {
-                                                code: err.code,
-                                                message: err.message,
-                                                data: err.data,
-                                            }),
-                                            conn,
-                                        ));
-                                    }
+                                if let Some(err) = error.error {
+                                    return Some((
+                                        Err(A2AError::JsonRpc {
+                                            code: err.code,
+                                            message: err.message,
+                                            data: err.data,
+                                        }),
+                                        conn,
+                                    ));
                                 }
                             }
 

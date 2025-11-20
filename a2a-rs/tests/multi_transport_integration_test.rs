@@ -112,15 +112,21 @@ async fn test_dual_protocol_agent() {
         http_agent_card["name"].as_str().unwrap(),
         "Dual Protocol Agent"
     );
-    assert!(http_agent_card["capabilities"]["streaming"]
-        .as_bool()
-        .unwrap());
-    assert!(http_agent_card["capabilities"]["pushNotifications"]
-        .as_bool()
-        .unwrap());
-    assert!(http_agent_card["capabilities"]["stateTransitionHistory"]
-        .as_bool()
-        .unwrap());
+    assert!(
+        http_agent_card["capabilities"]["streaming"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        http_agent_card["capabilities"]["pushNotifications"]
+            .as_bool()
+            .unwrap()
+    );
+    assert!(
+        http_agent_card["capabilities"]["stateTransitionHistory"]
+            .as_bool()
+            .unwrap()
+    );
 
     // Test 2: Create clients for both protocols
     let http_a2a_client = HttpClient::new("http://localhost:8184".to_string());

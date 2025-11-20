@@ -8,8 +8,8 @@ use a2a_rs::{
     adapter::{
         DefaultRequestProcessor, HttpClient, HttpServer, InMemoryTaskStorage, SimpleAgentInfo,
     },
-    domain::{ListTasksParams, Message, Task, TaskState},
-    port::{AsyncNotificationManager, AsyncTaskManager},
+    domain::{ListTasksParams, Message, TaskState},
+    port::AsyncTaskManager,
     services::AsyncA2AClient,
 };
 use common::TestBusinessHandler;
@@ -259,7 +259,7 @@ async fn test_http_client_list_tasks_include_artifacts() {
 #[tokio::test]
 async fn test_http_client_push_config_list() {
     let port = 9605;
-    let (shutdown_tx, storage) = setup_test_server(port).await;
+    let (shutdown_tx, _storage) = setup_test_server(port).await;
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
@@ -300,7 +300,7 @@ async fn test_http_client_push_config_list() {
 #[tokio::test]
 async fn test_http_client_push_config_get() {
     let port = 9606;
-    let (shutdown_tx, storage) = setup_test_server(port).await;
+    let (shutdown_tx, _storage) = setup_test_server(port).await;
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
@@ -344,7 +344,7 @@ async fn test_http_client_push_config_get() {
 #[tokio::test]
 async fn test_http_client_push_config_delete() {
     let port = 9607;
-    let (shutdown_tx, storage) = setup_test_server(port).await;
+    let (shutdown_tx, _storage) = setup_test_server(port).await;
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
@@ -404,7 +404,7 @@ async fn test_http_client_push_config_delete() {
 #[tokio::test]
 async fn test_http_client_push_config_multiple() {
     let port = 9608;
-    let (shutdown_tx, storage) = setup_test_server(port).await;
+    let (shutdown_tx, _storage) = setup_test_server(port).await;
 
     let client = HttpClient::new(format!("http://localhost:{}", port));
 
