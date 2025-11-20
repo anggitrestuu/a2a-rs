@@ -8,12 +8,12 @@ use async_trait::async_trait;
 
 use crate::{
     application::{
+        JSONRPCError, JSONRPCResponse,
         json_rpc::{
             self, A2ARequest, CancelTaskRequest, GetExtendedCardRequest,
             GetTaskPushNotificationRequest, GetTaskRequest, SendTaskRequest,
             SendTaskStreamingRequest, SetTaskPushNotificationRequest, TaskResubscriptionRequest,
         },
-        JSONRPCError, JSONRPCResponse,
     },
     domain::A2AError,
     port::{AsyncMessageHandler, AsyncNotificationManager, AsyncTaskManager},
@@ -94,10 +94,23 @@ where
         let params = &request.params;
         let session_id = params.session_id.as_deref();
 
+        tracing::info!(
+            task_id = %params.id,
+            message_id = %params.message.message_id,
+            "🔄 DefaultRequestProcessor: About to call message_handler.process_message"
+        );
+
+        // Process the message through the handler
+        // The handler is responsible for managing history
         let task = self
             .message_handler
             .process_message(&params.id, &params.message, session_id)
             .await?;
+
+        tracing::info!(
+            task_id = %params.id,
+            "✅ DefaultRequestProcessor: Message handler returned successfully"
+        );
 
         Ok(JSONRPCResponse::success(
             request.id.clone(),
@@ -177,15 +190,35 @@ where
         // For resubscription, we return an initial success response,
         // and then the streaming updates are handled separately
         let params = &request.params;
-        let task = self
+
+        // Try to get the task, but don't fail if it doesn't exist
+        // This allows clients to subscribe to tasks before they're created
+        match self
             .task_manager
             .get_task(&params.id, params.history_length)
-            .await?;
-
-        Ok(JSONRPCResponse::success(
-            request.id.clone(),
-            serde_json::to_value(task)?,
-        ))
+            .await
+        {
+            Ok(task) => {
+                // Task exists, return it
+                Ok(JSONRPCResponse::success(
+                    request.id.clone(),
+                    serde_json::to_value(task)?,
+                ))
+            }
+            Err(A2AError::TaskNotFound(_)) => {
+                // Task doesn't exist yet, return null result
+                // The WebSocket server will still set up subscriptions
+                // and send updates when the task is created
+                Ok(JSONRPCResponse::success(
+                    request.id.clone(),
+                    serde_json::Value::Null,
+                ))
+            }
+            Err(e) => {
+                // Other errors should still be propagated
+                Err(e)
+            }
+        }
     }
 
     /// Process a send task streaming request
@@ -198,6 +231,8 @@ where
         let params = &request.params;
         let session_id = params.session_id.as_deref();
 
+        // Process the message through the handler
+        // The handler is responsible for managing history
         let task = self
             .message_handler
             .process_message(&params.id, &params.message, session_id)
@@ -219,6 +254,87 @@ where
         // that may only be available to authenticated clients.
         // Authentication checking should be handled by middleware.
         let card = self.agent_info.get_agent_card().await?;
+
+        Ok(JSONRPCResponse::success(
+            request.id.clone(),
+            serde_json::to_value(card)?,
+        ))
+    }
+
+    // ===== v0.3.0 New Methods =====
+
+    async fn process_list_tasks(
+        &self,
+        request: &crate::application::handlers::task::ListTasksRequest,
+    ) -> Result<JSONRPCResponse, A2AError> {
+        let default_params = crate::domain::ListTasksParams::default();
+        let params = request.params.as_ref().unwrap_or(&default_params);
+        let result = self.task_manager.list_tasks_v3(params).await?;
+
+        Ok(JSONRPCResponse::success(
+            request.id.clone(),
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    async fn process_get_push_notification_config(
+        &self,
+        request: &crate::application::handlers::task::GetTaskPushNotificationConfigRequest,
+    ) -> Result<JSONRPCResponse, A2AError> {
+        if let Some(ref params) = request.params {
+            let result = self
+                .task_manager
+                .get_push_notification_config(params)
+                .await?;
+
+            Ok(JSONRPCResponse::success(
+                request.id.clone(),
+                serde_json::to_value(result)?,
+            ))
+        } else {
+            Err(A2AError::InvalidParams(
+                "Missing params for get push notification config".to_string(),
+            ))
+        }
+    }
+
+    async fn process_list_push_notification_configs(
+        &self,
+        request: &crate::application::handlers::task::ListTaskPushNotificationConfigRequest,
+    ) -> Result<JSONRPCResponse, A2AError> {
+        let result = self
+            .task_manager
+            .list_push_notification_configs(&request.params)
+            .await?;
+
+        Ok(JSONRPCResponse::success(
+            request.id.clone(),
+            serde_json::to_value(result)?,
+        ))
+    }
+
+    async fn process_delete_push_notification_config(
+        &self,
+        request: &crate::application::handlers::task::DeleteTaskPushNotificationConfigRequest,
+    ) -> Result<JSONRPCResponse, A2AError> {
+        self.task_manager
+            .delete_push_notification_config(&request.params)
+            .await?;
+
+        // Return null on success
+        Ok(JSONRPCResponse::success(
+            request.id.clone(),
+            serde_json::Value::Null,
+        ))
+    }
+
+    async fn process_get_authenticated_extended_card(
+        &self,
+        request: &crate::application::handlers::agent::GetAuthenticatedExtendedCardRequest,
+    ) -> Result<JSONRPCResponse, A2AError> {
+        // Get the authenticated extended card from the agent info provider
+        // Authentication checking should be handled by middleware before this point
+        let card = self.agent_info.get_authenticated_extended_card().await?;
 
         Ok(JSONRPCResponse::success(
             request.id.clone(),
@@ -293,6 +409,20 @@ where
                 ))
             }
             A2ARequest::GetExtendedCard(req) => self.process_get_extended_card(req).await,
+            // v0.3.0 new methods
+            A2ARequest::ListTasks(req) => self.process_list_tasks(req).await,
+            A2ARequest::GetTaskPushNotificationConfig(req) => {
+                self.process_get_push_notification_config(req).await
+            }
+            A2ARequest::ListTaskPushNotificationConfigs(req) => {
+                self.process_list_push_notification_configs(req).await
+            }
+            A2ARequest::DeleteTaskPushNotificationConfig(req) => {
+                self.process_delete_push_notification_config(req).await
+            }
+            A2ARequest::GetAuthenticatedExtendedCard(req) => {
+                self.process_get_authenticated_extended_card(req).await
+            }
             A2ARequest::Generic(req) => {
                 // Handle unknown method
                 Err(A2AError::MethodNotFound(format!(

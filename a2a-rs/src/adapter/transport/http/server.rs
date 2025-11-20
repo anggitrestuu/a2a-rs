@@ -5,20 +5,20 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::State,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 #[cfg(feature = "tracing")]
 use tracing::{debug, error, info, instrument};
 
 use crate::{
     adapter::{
-        auth::{with_auth, NoopAuthenticator},
+        auth::{NoopAuthenticator, with_auth},
         error::HttpServerError,
     },
     domain::A2AError,

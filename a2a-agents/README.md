@@ -33,31 +33,58 @@ The server implementation using framework components:
 
 ## Usage
 
-Run the modern reimbursement agent server:
+### Quick Start - Unified Demo (Recommended)
+
+Run the complete demo with both agent backend and web frontend in a single command:
 
 ```bash
-# Run both HTTP and WebSocket servers (default)
-cargo run --bin reimbursement_server
+# Run everything (agent backend + web UI)
+cargo run --bin reimbursement_demo
 
-# Run HTTP server only on custom port
-cargo run --bin reimbursement_server -- --mode http --port 8080
+# Open your browser to http://localhost:3000
+```
 
-# Run WebSocket server only
-cargo run --bin reimbursement_server -- --mode websocket
+This starts:
+- **Agent Backend** on `http://localhost:8080` (HTTP) and `ws://localhost:8081` (WebSocket)
+- **Web Frontend** on `http://localhost:3000`
 
-# Custom host and port
-cargo run --bin reimbursement_server -- --host 0.0.0.0 --port 9000 --mode both
+The frontend automatically connects to the local agent and provides an interactive interface for submitting expenses and viewing tasks.
+
+### Advanced Usage
+
+Run specific components:
+
+```bash
+# Run only the agent backend (HTTP + WebSocket)
+cargo run --bin reimbursement_demo -- --mode agent
+
+# Run only the web frontend (point it to an existing agent)
+AGENT_HTTP_URL=http://localhost:8080 cargo run --bin reimbursement_demo -- --mode frontend
+
+# Customize ports
+cargo run --bin reimbursement_demo -- \
+  --agent-http-port 8080 \
+  --agent-ws-port 8081 \
+  --frontend-port 3000
+
+# Run only HTTP transport for agent
+cargo run --bin reimbursement_demo -- --transport http
+
+# Enable WebSocket support in frontend
+cargo run --bin reimbursement_demo -- --frontend-use-websocket
 ```
 
 ### Available Endpoints
 
-**HTTP Server (default port 10002):**
-- Agent Card: `http://localhost:10002/agent-card`
-- Skills List: `http://localhost:10002/skills`
-- A2A Protocol: `http://localhost:10002/` (JSON-RPC)
+**Agent Backend:**
+- HTTP API: `http://localhost:8080` (JSON-RPC)
+- WebSocket: `ws://localhost:8081`
+- Agent Card: `http://localhost:8080/agent-card`
 
-**WebSocket Server (default port 10003):**
-- WebSocket Endpoint: `ws://localhost:10003/`
+**Web Frontend:**
+- Main UI: `http://localhost:3000`
+- Task List: `http://localhost:3000/tasks`
+- Expense Form: `http://localhost:3000/expense/new`
 
 ## Example Conversation
 

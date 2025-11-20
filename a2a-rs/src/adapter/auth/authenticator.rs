@@ -17,7 +17,7 @@ use axum::{
 type HeaderMap = std::collections::HashMap<String, String>;
 
 use crate::{
-    domain::{core::agent::SecurityScheme, A2AError},
+    domain::{A2AError, core::agent::SecurityScheme},
     port::authenticator::{AuthContext, AuthContextExtractor, AuthPrincipal, Authenticator},
 };
 

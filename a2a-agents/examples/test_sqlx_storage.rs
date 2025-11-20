@@ -25,7 +25,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("🚀 Starting Reimbursement Agent with SQLx Storage");
     println!("📦 Database: sqlite://reimbursement_test.db");
-    println!("✨ Automatic Migrations: Both base A2A tables and reimbursement tables will be created automatically!");
+    println!(
+        "✨ Automatic Migrations: Both base A2A tables and reimbursement tables will be created automatically!"
+    );
     println!("📝 No manual migration needed - SQLx handles everything!");
     println!();
 

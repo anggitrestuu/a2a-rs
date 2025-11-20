@@ -5,10 +5,10 @@ use futures::Stream;
 use std::pin::Pin;
 
 use crate::{
-    application::{json_rpc::A2ARequest, JSONRPCResponse},
+    application::{JSONRPCResponse, json_rpc::A2ARequest},
     domain::{
-        A2AError, Message, Task, TaskArtifactUpdateEvent, TaskPushNotificationConfig,
-        TaskStatusUpdateEvent,
+        A2AError, ListTasksParams, ListTasksResult, Message, Task, TaskArtifactUpdateEvent,
+        TaskPushNotificationConfig, TaskStatusUpdateEvent,
     },
 };
 
@@ -51,6 +51,32 @@ pub trait AsyncA2AClient: Send + Sync {
         &self,
         task_id: &'a str,
     ) -> Result<TaskPushNotificationConfig, A2AError>;
+
+    /// List tasks with filtering and pagination (v0.3.0)
+    async fn list_tasks<'a>(
+        &self,
+        params: &'a ListTasksParams,
+    ) -> Result<ListTasksResult, A2AError>;
+
+    /// List all push notification configs for a task (v0.3.0)
+    async fn list_push_notification_configs<'a>(
+        &self,
+        task_id: &'a str,
+    ) -> Result<Vec<TaskPushNotificationConfig>, A2AError>;
+
+    /// Get a specific push notification config by ID (v0.3.0)
+    async fn get_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<TaskPushNotificationConfig, A2AError>;
+
+    /// Delete a specific push notification config (v0.3.0)
+    async fn delete_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<(), A2AError>;
 
     /// Subscribe to task updates (for streaming)
     async fn subscribe_to_task<'a>(

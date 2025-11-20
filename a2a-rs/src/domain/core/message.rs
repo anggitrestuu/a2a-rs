@@ -198,6 +198,9 @@ pub struct Message {
     pub task_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "contextId")]
     pub context_id: Option<String>,
+    /// URIs of extensions relevant to this message (v0.3.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Vec<String>>,
     #[builder(default = "message".to_string())]
     pub kind: String, // Always "message"
 }
@@ -221,6 +224,7 @@ pub struct Message {
 ///         metadata: None,
 ///     }],
 ///     metadata: None,
+///     extensions: None,
 /// };
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,6 +238,9 @@ pub struct Artifact {
     pub parts: Vec<Part>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Map<String, Value>>,
+    /// URIs of extensions relevant to this artifact (v0.3.0)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Vec<String>>,
 }
 
 /// Helper methods for creating parts
@@ -347,18 +354,9 @@ impl PartBuilder {
     /// Add metadata to any part type
     pub fn with_metadata(mut self, metadata: Map<String, Value>) -> Self {
         match &mut self.part {
-            Part::Text {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
-            Part::Data {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
-            Part::File {
-                metadata: ref mut meta,
-                ..
-            } => *meta = Some(metadata),
+            Part::Text { metadata: meta, .. } => *meta = Some(metadata),
+            Part::Data { metadata: meta, .. } => *meta = Some(metadata),
+            Part::File { metadata: meta, .. } => *meta = Some(metadata),
         }
         self
     }
@@ -452,6 +450,7 @@ impl Message {
             message_id,
             task_id: None,
             context_id: None,
+            extensions: None,
             kind: "message".to_string(),
         }
     }
@@ -466,6 +465,7 @@ impl Message {
             message_id,
             task_id: None,
             context_id: None,
+            extensions: None,
             kind: "message".to_string(),
         }
     }

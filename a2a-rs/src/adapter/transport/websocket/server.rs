@@ -6,10 +6,10 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{mpsc, Mutex}, // Changed to tokio::sync::Mutex
+    sync::{Mutex, mpsc}, // Changed to tokio::sync::Mutex
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message as WsMessage};
 
@@ -19,7 +19,7 @@ use tracing::{debug, error, info, instrument};
 use crate::{
     adapter::{auth::NoopAuthenticator, error::WebSocketServerError},
     domain::{A2AError, TaskArtifactUpdateEvent, TaskStatusUpdateEvent},
-    port::{streaming_handler::Subscriber, AsyncStreamingHandler, Authenticator},
+    port::{AsyncStreamingHandler, Authenticator, streaming_handler::Subscriber},
     services::server::{AgentInfoProvider, AsyncA2ARequestProcessor},
 };
 

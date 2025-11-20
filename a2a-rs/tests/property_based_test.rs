@@ -5,9 +5,9 @@
 //! protocol compliance.
 
 use a2a_rs::{
+    MessageSendParams,
     adapter::SimpleAgentInfo,
     domain::{AgentSkill, Message, Part, Role, Task, TaskState},
-    MessageSendParams,
 };
 use base64::Engine;
 use proptest::prelude::*;

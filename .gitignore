@@ -4,3 +4,13 @@
 CLAUDE.md
 a2a-client/leptos/
 
+# Environment files
+.env
+.env.*
+*.env
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+

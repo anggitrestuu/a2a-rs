@@ -1,14 +1,16 @@
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
 use a2a_agents::reimbursement_agent::handler::ReimbursementHandler;
 use a2a_rs::domain::{Message, Part, Role};
 use a2a_rs::port::message_handler::AsyncMessageHandler;
+use a2a_rs::adapter::storage::InMemoryTaskStorage;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize the handler
-    let handler = ReimbursementHandler::new();
+    // Initialize the handler with in-memory task storage
+    let task_storage = InMemoryTaskStorage::new();
+    let handler = ReimbursementHandler::new(task_storage);
 
     // Example 1: Text part with metadata hints
     println!("=== Example 1: Text with metadata ===");

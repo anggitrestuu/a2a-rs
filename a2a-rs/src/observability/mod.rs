@@ -4,7 +4,7 @@
 //! to help with debugging, monitoring, and understanding system behavior.
 
 #[cfg(feature = "tracing")]
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Initialize tracing with sensible defaults for the A2A application
 ///

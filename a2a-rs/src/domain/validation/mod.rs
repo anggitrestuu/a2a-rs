@@ -29,7 +29,7 @@ pub mod validators {
 
     /// Validate that an optional string, if present, is not empty
     pub fn optional_not_empty(value: &Option<String>, field_name: &str) -> ValidationResult<()> {
-        if let Some(ref val) = value {
+        if let Some(val) = value {
             not_empty(val, field_name)
         } else {
             Ok(())

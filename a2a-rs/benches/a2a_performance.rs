@@ -4,13 +4,13 @@
 //! task operations, and streaming functionality to establish baseline metrics.
 
 use a2a_rs::{
+    MessageSendParams,
     adapter::SimpleAgentInfo,
     application::SendMessageRequest,
     domain::{AgentSkill, Message, Part, Task, TaskState},
-    MessageSendParams,
 };
 use base64::Engine;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use serde_json::{self};
 
 /// Benchmark message serialization performance

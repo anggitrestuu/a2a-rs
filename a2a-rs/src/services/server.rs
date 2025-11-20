@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    application::{json_rpc::A2ARequest, JSONRPCResponse},
+    application::{JSONRPCResponse, json_rpc::A2ARequest},
     domain::{A2AError, AgentCard, AgentSkill},
 };
 
@@ -29,6 +29,15 @@ pub trait AgentInfoProvider: Send + Sync {
     async fn has_skill(&self, id: &str) -> Result<bool, A2AError> {
         let skill = self.get_skill_by_id(id).await?;
         Ok(skill.is_some())
+    }
+
+    /// Get the authenticated extended agent card (v0.3.0)
+    ///
+    /// Returns an extended version of the agent card with authenticated-only information.
+    /// By default, returns AuthenticatedExtendedCardNotConfigured error.
+    /// Override this method to provide authenticated extended card support.
+    async fn get_authenticated_extended_card(&self) -> Result<AgentCard, A2AError> {
+        Err(A2AError::AuthenticatedExtendedCardNotConfigured)
     }
 }
 

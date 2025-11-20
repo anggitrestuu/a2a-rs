@@ -4,8 +4,8 @@
 
 use async_trait::async_trait;
 use futures::{
-    stream::{Stream, StreamExt},
     SinkExt,
+    stream::{Stream, StreamExt},
 };
 use serde_json::Value;
 use std::{pin::Pin, sync::Arc, time::Duration};
@@ -14,7 +14,7 @@ use tokio::{
     sync::Mutex, // Changed to tokio::sync::Mutex
 };
 use tokio_tungstenite::{
-    connect_async, tungstenite::protocol::Message as WsMessage, MaybeTlsStream, WebSocketStream,
+    MaybeTlsStream, WebSocketStream, connect_async, tungstenite::protocol::Message as WsMessage,
 };
 use url::Url;
 
@@ -24,8 +24,8 @@ use tracing::{debug, trace};
 use crate::{
     adapter::error::WebSocketClientError,
     application::{
-        json_rpc::{self, A2ARequest, SendTaskRequest, TaskResubscriptionRequest},
         JSONRPCResponse,
+        json_rpc::{self, A2ARequest, SendTaskRequest, TaskResubscriptionRequest},
     },
     domain::{
         A2AError, Message, Task, TaskArtifactUpdateEvent, TaskIdParams, TaskPushNotificationConfig,
@@ -214,23 +214,19 @@ impl AsyncA2AClient for WebSocketClient {
         let request = json_rpc::GetTaskRequest::new(params);
         let response = self.send_request(&A2ARequest::GetTask(request)).await?;
 
-        match response.result {
-            Some(value) => {
-                let task: Task = serde_json::from_value(value)?;
-                Ok(task)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let task: Task = serde_json::from_value(value)?;
+        Ok(task)
     }
 
     async fn cancel_task<'a>(&self, task_id: &'a str) -> Result<Task, A2AError> {
@@ -242,23 +238,19 @@ impl AsyncA2AClient for WebSocketClient {
         let request = json_rpc::CancelTaskRequest::new(params);
         let response = self.send_request(&A2ARequest::CancelTask(request)).await?;
 
-        match response.result {
-            Some(value) => {
-                let task: Task = serde_json::from_value(value)?;
-                Ok(task)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let task: Task = serde_json::from_value(value)?;
+        Ok(task)
     }
 
     async fn set_task_push_notification<'a>(
@@ -270,23 +262,19 @@ impl AsyncA2AClient for WebSocketClient {
             .send_request(&A2ARequest::SetTaskPushNotification(request))
             .await?;
 
-        match response.result {
-            Some(value) => {
-                let config: TaskPushNotificationConfig = serde_json::from_value(value)?;
-                Ok(config)
+        let Some(value) = response.result else {
+            if let Some(error) = response.error {
+                return Err(A2AError::JsonRpc {
+                    code: error.code,
+                    message: error.message,
+                    data: error.data,
+                });
             }
-            None => {
-                if let Some(error) = response.error {
-                    Err(A2AError::JsonRpc {
-                        code: error.code,
-                        message: error.message,
-                        data: error.data,
-                    })
-                } else {
-                    Err(A2AError::Internal("Empty response".to_string()))
-                }
-            }
-        }
+            return Err(A2AError::Internal("Empty response".to_string()));
+        };
+
+        let config: TaskPushNotificationConfig = serde_json::from_value(value)?;
+        Ok(config)
     }
 
     async fn get_task_push_notification<'a>(
@@ -319,6 +307,136 @@ impl AsyncA2AClient for WebSocketClient {
                     Err(A2AError::Internal("Empty response".to_string()))
                 }
             }
+        }
+    }
+
+    async fn list_tasks<'a>(
+        &self,
+        params: &'a crate::domain::ListTasksParams,
+    ) -> Result<crate::domain::ListTasksResult, A2AError> {
+        let request = json_rpc::ListTasksRequest::new(Some(params.clone()));
+        let response = self.send_request(&A2ARequest::ListTasks(request)).await?;
+
+        match response.result {
+            Some(value) => {
+                let result: crate::domain::ListTasksResult = serde_json::from_value(value)?;
+                Ok(result)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn list_push_notification_configs<'a>(
+        &self,
+        task_id: &'a str,
+    ) -> Result<Vec<crate::domain::TaskPushNotificationConfig>, A2AError> {
+        use crate::domain::ListTaskPushNotificationConfigParams;
+
+        let request = json_rpc::ListTaskPushNotificationConfigRequest::new(
+            ListTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::ListTaskPushNotificationConfigs(request))
+            .await?;
+
+        match response.result {
+            Some(value) => {
+                let configs: Vec<crate::domain::TaskPushNotificationConfig> =
+                    serde_json::from_value(value)?;
+                Ok(configs)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn get_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<crate::domain::TaskPushNotificationConfig, A2AError> {
+        use crate::domain::GetTaskPushNotificationConfigParams;
+
+        let request = json_rpc::GetTaskPushNotificationConfigRequest::new(
+            GetTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                push_notification_config_id: Some(config_id.to_string()),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::GetTaskPushNotificationConfig(request))
+            .await?;
+
+        match response.result {
+            Some(value) => {
+                let config: crate::domain::TaskPushNotificationConfig =
+                    serde_json::from_value(value)?;
+                Ok(config)
+            }
+            None => {
+                if let Some(error) = response.error {
+                    Err(A2AError::JsonRpc {
+                        code: error.code,
+                        message: error.message,
+                        data: error.data,
+                    })
+                } else {
+                    Err(A2AError::Internal("Empty response".to_string()))
+                }
+            }
+        }
+    }
+
+    async fn delete_push_notification_config<'a>(
+        &self,
+        task_id: &'a str,
+        config_id: &'a str,
+    ) -> Result<(), A2AError> {
+        use crate::domain::DeleteTaskPushNotificationConfigParams;
+
+        let request = json_rpc::DeleteTaskPushNotificationConfigRequest::new(
+            DeleteTaskPushNotificationConfigParams {
+                id: task_id.to_string(),
+                push_notification_config_id: config_id.to_string(),
+                metadata: None,
+            },
+        );
+        let response = self
+            .send_request(&A2ARequest::DeleteTaskPushNotificationConfig(request))
+            .await?;
+
+        // For delete operations, both Some(Null) and None are success if there's no error
+        if let Some(error) = response.error {
+            Err(A2AError::JsonRpc {
+                code: error.code,
+                message: error.message,
+                data: error.data,
+            })
+        } else {
+            Ok(())
         }
     }
 
@@ -360,48 +478,52 @@ impl AsyncA2AClient for WebSocketClient {
         // Create a stream that will process incoming messages
         let stream = futures::stream::unfold(connection, move |conn| {
             Box::pin(async move {
-                // Get the next message from the WebSocket
-                let message_result = {
-                    let mut guard = conn.lock().await;
-                    guard.next().await
-                }; // Lock is dropped here
-                   // Process result outside the lock scope
-                let message = match message_result {
-                    Some(Ok(msg)) => msg,
-                    Some(Err(e)) => {
-                        return Some((
-                            Err(
-                                WebSocketClientError::Message(format!("WebSocket error: {}", e))
-                                    .into(),
-                            ),
-                            conn,
-                        ));
-                    }
-                    None => {
-                        return Some((Err(WebSocketClientError::Closed.into()), conn));
-                    }
-                };
+                // Loop until we get a non-null message or an error
+                loop {
+                    // Get the next message from the WebSocket
+                    let message_result = {
+                        let mut guard = conn.lock().await;
+                        guard.next().await
+                    }; // Lock is dropped here
+                    // Process result outside the lock scope
+                    let message = match message_result {
+                        Some(Ok(msg)) => msg,
+                        Some(Err(e)) => {
+                            return Some((
+                                Err(WebSocketClientError::Message(format!(
+                                    "WebSocket error: {}",
+                                    e
+                                ))
+                                .into()),
+                                conn,
+                            ));
+                        }
+                        None => {
+                            return Some((Err(WebSocketClientError::Closed.into()), conn));
+                        }
+                    };
 
-                // Process the message
-                let result = match message {
-                    WsMessage::Text(text) => {
-                        // Add debug logging for received messages
-                        #[cfg(feature = "tracing")]
-                        trace!("Received WebSocket message: {}", text);
+                    // Process the message
+                    match message {
+                        WsMessage::Text(text) => {
+                            // Add debug logging for received messages
+                            #[cfg(feature = "tracing")]
+                            trace!("Received WebSocket message: {}", text);
 
-                        // Parse the response
-                        let response: Value = match serde_json::from_str(&text) {
-                            Ok(value) => value,
-                            Err(e) => {
-                                #[cfg(feature = "tracing")]
-                                debug!("JSON parse error: {}", e);
-                                return Some((Err(A2AError::JsonParse(e)), conn));
-                            }
-                        };
+                            // Parse the response
+                            let response: Value = match serde_json::from_str(&text) {
+                                Ok(value) => value,
+                                Err(e) => {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("JSON parse error: {}", e);
+                                    return Some((Err(A2AError::JsonParse(e)), conn));
+                                }
+                            };
 
-                        // Check for errors
-                        if let Some(error) = response.get("error") {
-                            if error.is_object() {
+                            // Check for errors
+                            if let Some(error) = response.get("error")
+                                && error.is_object()
+                            {
                                 let response_clone = response.clone();
                                 let error: JSONRPCResponse =
                                     match serde_json::from_value(response_clone) {
@@ -422,56 +544,74 @@ impl AsyncA2AClient for WebSocketClient {
                                     ));
                                 }
                             }
-                        }
 
-                        // Check if it's a valid JSON-RPC message
-                        if response.get("jsonrpc").is_some() && response.get("result").is_some() {
-                            let result = response.get("result").cloned().unwrap_or(Value::Null);
-
-                            // Try to parse as an initial Task response first
-                            if let Ok(task) = serde_json::from_value::<Task>(result.clone()) {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as Task");
-                                return Some((Ok(StreamItem::Task(task)), conn));
-                            }
-
-                            // Try to parse as a status update
-                            if let Ok(status_update) =
-                                serde_json::from_value::<TaskStatusUpdateEvent>(result.clone())
+                            // Check if it's a valid JSON-RPC message
+                            if response.get("jsonrpc").is_some() && response.get("result").is_some()
                             {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as StatusUpdate");
-                                return Some((Ok(StreamItem::StatusUpdate(status_update)), conn));
+                                let result = response.get("result").cloned().unwrap_or(Value::Null);
+
+                                // If result is null, the task doesn't exist yet - keep streaming
+                                if result.is_null() {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Task doesn't exist yet, waiting for next message");
+                                    // Skip this message and wait for the next WebSocket message
+                                    continue; // Continue the loop to get the next message
+                                }
+
+                                // Try to parse as an initial Task response first
+                                if let Ok(task) = serde_json::from_value::<Task>(result.clone()) {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as Task");
+                                    return Some((Ok(StreamItem::Task(task)), conn));
+                                }
+
+                                // Try to parse as a status update
+                                if let Ok(status_update) =
+                                    serde_json::from_value::<TaskStatusUpdateEvent>(result.clone())
+                                {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as StatusUpdate");
+                                    return Some((
+                                        Ok(StreamItem::StatusUpdate(status_update)),
+                                        conn,
+                                    ));
+                                }
+
+                                // Try to parse as an artifact update
+                                if let Ok(artifact_update) =
+                                    serde_json::from_value::<TaskArtifactUpdateEvent>(result)
+                                {
+                                    #[cfg(feature = "tracing")]
+                                    debug!("Parsed streaming response as ArtifactUpdate");
+                                    return Some((
+                                        Ok(StreamItem::ArtifactUpdate(artifact_update)),
+                                        conn,
+                                    ));
+                                }
                             }
 
-                            // Try to parse as an artifact update
-                            if let Ok(artifact_update) =
-                                serde_json::from_value::<TaskArtifactUpdateEvent>(result)
-                            {
-                                #[cfg(feature = "tracing")]
-                                debug!("Parsed streaming response as ArtifactUpdate");
-                                return Some((
-                                    Ok(StreamItem::ArtifactUpdate(artifact_update)),
-                                    conn,
-                                ));
-                            }
+                            // If we got here, we couldn't parse the response
+                            #[cfg(feature = "tracing")]
+                            debug!("Failed to parse streaming response");
+                            return Some((
+                                Err(WebSocketClientError::Protocol(
+                                    "Failed to parse streaming response".to_string(),
+                                )
+                                .into()),
+                                conn,
+                            ));
                         }
-
-                        // If we got here, we couldn't parse the response
-                        #[cfg(feature = "tracing")]
-                        debug!("Failed to parse streaming response");
-                        Err(WebSocketClientError::Protocol(
-                            "Failed to parse streaming response".to_string(),
-                        )
-                        .into())
-                    }
-                    _ => Err(WebSocketClientError::Protocol(
-                        "Unexpected WebSocket message type".to_string(),
-                    )
-                    .into()),
-                };
-
-                Some((result, conn))
+                        _ => {
+                            return Some((
+                                Err(WebSocketClientError::Protocol(
+                                    "Unexpected WebSocket message type".to_string(),
+                                )
+                                .into()),
+                                conn,
+                            ));
+                        }
+                    }; // End of match
+                } // End of loop
             })
         });
 

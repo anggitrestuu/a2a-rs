@@ -57,7 +57,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(not(feature = "sqlx-storage"))]
     {
-        println!("⚠️  SQLx storage not available - compile with --features sqlite or --features postgres");
+        println!(
+            "⚠️  SQLx storage not available - compile with --features sqlite or --features postgres"
+        );
         println!();
     }
 

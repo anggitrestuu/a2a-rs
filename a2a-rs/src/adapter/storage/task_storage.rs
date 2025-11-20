@@ -21,8 +21,8 @@ use crate::domain::{
     TaskState, TaskStatus, TaskStatusUpdateEvent,
 };
 use crate::port::{
-    streaming_handler::Subscriber, AsyncNotificationManager, AsyncStreamingHandler,
-    AsyncTaskManager,
+    AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager,
+    streaming_handler::Subscriber,
 };
 
 type StatusSubscribers = Vec<Box<dyn Subscriber<TaskStatusUpdateEvent> + Send + Sync>>;
@@ -60,7 +60,7 @@ impl InMemoryTaskStorage {
         #[cfg(feature = "http-client")]
         let push_sender = HttpPushNotificationSender::new();
         #[cfg(not(feature = "http-client"))]
-        let push_sender = NoopPushNotificationSender::default();
+        let push_sender = NoopPushNotificationSender;
 
         let push_registry = PushNotificationRegistry::new(push_sender);
 
@@ -124,24 +124,69 @@ impl InMemoryTaskStorage {
             task_id: task_id.to_string(),
             context_id: "default".to_string(), // TODO: get actual context_id
             kind: "status-update".to_string(),
-            status,
+            status: status.clone(),
             final_,
             metadata: None,
         };
 
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            task_id = %task_id,
+            state = ?status.state,
+            "📡 Broadcasting status update to subscribers"
+        );
+
         // Get all subscribers for this task and notify them
-        {
+        let subscriber_count = {
             let subscribers_guard = self.subscribers.lock().await;
 
             if let Some(task_subscribers) = subscribers_guard.get(task_id) {
+                let count = task_subscribers.status.len();
+                #[cfg(feature = "tracing")]
+                tracing::info!(
+                    task_id = %task_id,
+                    subscriber_count = count,
+                    state = ?status.state,
+                    "📡 Notifying WebSocket subscribers of status update"
+                );
+
                 // Clone the subscribers so we don't hold the lock during notification
-                for subscriber in task_subscribers.status.iter() {
+                for (i, subscriber) in task_subscribers.status.iter().enumerate() {
                     if let Err(e) = subscriber.on_update(event.clone()).await {
+                        #[cfg(feature = "tracing")]
+                        tracing::error!(
+                            task_id = %task_id,
+                            subscriber_index = i,
+                            error = %e,
+                            "❌ Failed to notify subscriber"
+                        );
                         eprintln!("Failed to notify subscriber: {}", e);
+                    } else {
+                        #[cfg(feature = "tracing")]
+                        tracing::debug!(
+                            task_id = %task_id,
+                            subscriber_index = i,
+                            "✅ Successfully notified subscriber"
+                        );
                     }
                 }
+                count
+            } else {
+                #[cfg(feature = "tracing")]
+                tracing::warn!(
+                    task_id = %task_id,
+                    "⚠️  No WebSocket subscribers found for task"
+                );
+                0
             }
         }; // Lock is dropped here
+
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            task_id = %task_id,
+            notified_count = subscriber_count,
+            "📡 Finished broadcasting to WebSocket subscribers"
+        );
 
         // Send push notification if configured
         if let Err(e) = self
@@ -265,12 +310,12 @@ impl AsyncTaskManager for InMemoryTaskStorage {
         let task = {
             let tasks_guard = self.tasks.lock().await;
 
-            if let Some(task) = tasks_guard.get(task_id) {
-                // Apply history length limitation if specified
-                task.with_limited_history(history_length)
-            } else {
+            let Some(task) = tasks_guard.get(task_id) else {
                 return Err(A2AError::TaskNotFound(task_id.to_string()));
-            }
+            };
+
+            // Apply history length limitation if specified
+            task.with_limited_history(history_length)
         }; // Lock is dropped here
 
         Ok(task)
@@ -281,39 +326,40 @@ impl AsyncTaskManager for InMemoryTaskStorage {
         let task = {
             let mut tasks_guard = self.tasks.lock().await;
 
-            if let Some(task) = tasks_guard.get(task_id) {
-                let mut updated_task = task.clone();
-
-                // Only working tasks can be canceled
-                if updated_task.status.state != TaskState::Working {
-                    return Err(A2AError::TaskNotCancelable(format!(
-                        "Task {} is in state {:?} and cannot be canceled",
-                        task_id, updated_task.status.state
-                    )));
-                }
-
-                // Create a cancellation message to add to history
-                let cancel_message = Message {
-                    role: crate::domain::Role::Agent,
-                    parts: vec![crate::domain::Part::Text {
-                        text: format!("Task {} canceled.", task_id),
-                        metadata: None,
-                    }],
-                    metadata: None,
-                    reference_task_ids: None,
-                    message_id: uuid::Uuid::new_v4().to_string(),
-                    task_id: Some(task_id.to_string()),
-                    context_id: Some(updated_task.context_id.clone()),
-                    kind: "message".to_string(),
-                };
-
-                // Update the status with the cancellation message to track in history
-                updated_task.update_status(TaskState::Canceled, Some(cancel_message));
-                tasks_guard.insert(task_id.to_string(), updated_task.clone());
-                updated_task
-            } else {
+            let Some(task) = tasks_guard.get(task_id) else {
                 return Err(A2AError::TaskNotFound(task_id.to_string()));
+            };
+
+            let mut updated_task = task.clone();
+
+            // Only working tasks can be canceled
+            if updated_task.status.state != TaskState::Working {
+                return Err(A2AError::TaskNotCancelable(format!(
+                    "Task {} is in state {:?} and cannot be canceled",
+                    task_id, updated_task.status.state
+                )));
             }
+
+            // Create a cancellation message to add to history
+            let cancel_message = Message {
+                role: crate::domain::Role::Agent,
+                parts: vec![crate::domain::Part::Text {
+                    text: format!("Task {} canceled.", task_id),
+                    metadata: None,
+                }],
+                metadata: None,
+                reference_task_ids: None,
+                message_id: uuid::Uuid::new_v4().to_string(),
+                task_id: Some(task_id.to_string()),
+                context_id: Some(updated_task.context_id.clone()),
+                extensions: None,
+                kind: "message".to_string(),
+            };
+
+            // Update the status with the cancellation message to track in history
+            updated_task.update_status(TaskState::Canceled, Some(cancel_message));
+            tasks_guard.insert(task_id.to_string(), updated_task.clone());
+            updated_task
         }; // Lock is dropped here
 
         // Broadcast status update (with final flag set to true)
@@ -321,6 +367,144 @@ impl AsyncTaskManager for InMemoryTaskStorage {
             .await?;
 
         Ok(task)
+    }
+
+    // ===== v0.3.0 New Methods =====
+
+    async fn list_tasks_v3<'a>(
+        &self,
+        params: &'a crate::domain::ListTasksParams,
+    ) -> Result<crate::domain::ListTasksResult, A2AError> {
+        use crate::domain::ListTasksResult;
+
+        let tasks_guard = self.tasks.lock().await;
+
+        // Filter tasks based on parameters
+        let mut filtered_tasks: Vec<_> = tasks_guard
+            .values()
+            .filter(|task| {
+                // Filter by context_id if provided
+                if let Some(ref context_id) = params.context_id {
+                    if &task.context_id != context_id {
+                        return false;
+                    }
+                }
+
+                // Filter by status if provided
+                if let Some(ref status) = params.status {
+                    if &task.status.state != status {
+                        return false;
+                    }
+                }
+
+                // Filter by lastUpdatedAfter if provided
+                if let Some(last_updated_after) = params.last_updated_after {
+                    if let Some(timestamp) = task.status.timestamp {
+                        let task_time_ms = timestamp.timestamp_millis();
+                        if task_time_ms <= last_updated_after {
+                            return false;
+                        }
+                    }
+                }
+
+                true
+            })
+            .cloned()
+            .collect();
+
+        // Sort by timestamp (most recent first)
+        filtered_tasks.sort_by(|a, b| {
+            let a_time = a
+                .status
+                .timestamp
+                .map(|t| t.timestamp_millis())
+                .unwrap_or(0);
+            let b_time = b
+                .status
+                .timestamp
+                .map(|t| t.timestamp_millis())
+                .unwrap_or(0);
+            b_time.cmp(&a_time)
+        });
+
+        let total_size = filtered_tasks.len() as i32;
+
+        // Handle pagination
+        let page_size = params.page_size.unwrap_or(50).clamp(1, 100) as usize;
+        let page_start = if let Some(ref token) = params.page_token {
+            // Parse page token as a number (simple implementation)
+            token.parse::<usize>().unwrap_or(0)
+        } else {
+            0
+        };
+
+        let page_end = (page_start + page_size).min(filtered_tasks.len());
+        let has_more = page_end < filtered_tasks.len();
+
+        // Get the page of tasks
+        let mut page_tasks: Vec<_> = filtered_tasks[page_start..page_end].to_vec();
+
+        // Apply history length limit
+        let history_length = params.history_length.unwrap_or(0);
+        for task in &mut page_tasks {
+            *task = task.with_limited_history(Some(history_length as u32));
+
+            // Remove artifacts if not requested
+            if !params.include_artifacts.unwrap_or(false) {
+                task.artifacts = None;
+            }
+        }
+
+        // Generate next page token
+        let next_page_token = if has_more {
+            page_end.to_string()
+        } else {
+            String::new()
+        };
+
+        Ok(ListTasksResult {
+            tasks: page_tasks,
+            total_size,
+            page_size: page_size as i32,
+            next_page_token,
+        })
+    }
+
+    async fn get_push_notification_config<'a>(
+        &self,
+        params: &'a crate::domain::GetTaskPushNotificationConfigParams,
+    ) -> Result<crate::domain::TaskPushNotificationConfig, A2AError> {
+        // For in-memory storage, we don't support multiple configs per task yet
+        // Just use the existing get_task_notification method
+        self.get_task_notification(&params.id).await
+    }
+
+    async fn list_push_notification_configs<'a>(
+        &self,
+        params: &'a crate::domain::ListTaskPushNotificationConfigParams,
+    ) -> Result<Vec<crate::domain::TaskPushNotificationConfig>, A2AError> {
+        // For in-memory storage, we only support one config per task
+        // Return it as a single-item vec
+        match self
+            .push_notification_registry
+            .get_config(&params.id)
+            .await?
+        {
+            Some(config) => Ok(vec![crate::domain::TaskPushNotificationConfig {
+                task_id: params.id.clone(),
+                push_notification_config: config,
+            }]),
+            None => Ok(vec![]),
+        }
+    }
+
+    async fn delete_push_notification_config<'a>(
+        &self,
+        params: &'a crate::domain::DeleteTaskPushNotificationConfigParams,
+    ) -> Result<(), A2AError> {
+        // For in-memory storage, just remove the single config
+        // In a full implementation, would need to handle config_id
+        self.remove_task_notification(&params.id).await
     }
 }
 
@@ -331,10 +515,23 @@ impl AsyncNotificationManager for InMemoryTaskStorage {
         &self,
         config: &'a TaskPushNotificationConfig,
     ) -> Result<TaskPushNotificationConfig, A2AError> {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %config.task_id,
+            url = %config.push_notification_config.url,
+            "✅ Registering push notification config for task"
+        );
+
         // Register with the push notification registry
         self.push_notification_registry
             .register(&config.task_id, config.push_notification_config.clone())
             .await?;
+
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %config.task_id,
+            "✅ Push notification config registered successfully"
+        );
 
         Ok(config.clone())
     }
@@ -367,6 +564,12 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         task_id: &'a str,
         subscriber: Box<dyn Subscriber<TaskStatusUpdateEvent> + Send + Sync>,
     ) -> Result<String, A2AError> {
+        #[cfg(feature = "tracing")]
+        tracing::info!(
+            task_id = %task_id,
+            "✅ Adding WebSocket subscriber for status updates"
+        );
+
         // Add the subscriber
         {
             let mut subscribers_guard = self.subscribers.lock().await;
@@ -376,12 +579,22 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
                 .or_insert_with(TaskSubscribers::new);
 
             task_subscribers.status.push(subscriber);
+
+            #[cfg(feature = "tracing")]
+            tracing::info!(
+                task_id = %task_id,
+                subscriber_count = task_subscribers.status.len(),
+                "✅ WebSocket subscriber added successfully"
+            );
         } // Lock is dropped here
 
-        // Get the current status (with full history) to send as an initial update
-        let task = self.get_task(task_id, None).await?;
-        self.broadcast_status_update(task_id, task.status, false)
-            .await?;
+        // Try to get the current status to send as an initial update
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            let _ = self
+                .broadcast_status_update(task_id, task.status, false)
+                .await;
+        }
 
         Ok(format!("status-{}-{}", task_id, uuid::Uuid::new_v4()))
     }
@@ -403,11 +616,14 @@ impl AsyncStreamingHandler for InMemoryTaskStorage {
         } // Lock is dropped here
 
         // If there are existing artifacts, broadcast them
-        let task = self.get_task(task_id, None).await?;
-        if let Some(artifacts) = task.artifacts {
-            for artifact in artifacts {
-                self.broadcast_artifact_update(task_id, artifact, None, false)
-                    .await?;
+        // But don't fail if the task doesn't exist yet - the subscriber will get updates when it's created
+        if let Ok(task) = self.get_task(task_id, None).await {
+            if let Some(artifacts) = task.artifacts {
+                for artifact in artifacts {
+                    let _ = self
+                        .broadcast_artifact_update(task_id, artifact, None, false)
+                        .await;
+                }
             }
         }
 

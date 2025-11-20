@@ -7,8 +7,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 #[cfg(feature = "http-client")]
 use reqwest::{
-    header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE},
     Client,
+    header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue},
 };
 use tokio::sync::Mutex;
 
@@ -142,15 +142,37 @@ impl PushNotificationSender for HttpPushNotificationSender {
     ) -> Result<(), A2AError> {
         let mut last_error = None;
 
+        #[cfg(feature = "tracing")]
+        tracing::debug!(
+            task_id = %event.task_id,
+            url = %config.url,
+            "Preparing to send HTTP push notification"
+        );
+
         // Try with retries
         for attempt in 0..=self.max_retries {
             // If this is a retry, wait with exponential backoff
             if attempt > 0 {
                 let backoff = self.backoff_ms * (1 << (attempt - 1));
+                #[cfg(feature = "tracing")]
+                tracing::debug!(
+                    task_id = %event.task_id,
+                    attempt = attempt,
+                    backoff_ms = backoff,
+                    "Retrying push notification after backoff"
+                );
                 tokio::time::sleep(tokio::time::Duration::from_millis(backoff)).await;
             }
 
             // Send the notification
+            #[cfg(feature = "tracing")]
+            tracing::debug!(
+                task_id = %event.task_id,
+                attempt = attempt,
+                url = %config.url,
+                "Sending HTTP POST request for push notification"
+            );
+
             match self
                 .client
                 .post(&config.url)
@@ -161,12 +183,32 @@ impl PushNotificationSender for HttpPushNotificationSender {
                 .await
             {
                 Ok(response) => {
+                    let status = response.status();
+                    #[cfg(feature = "tracing")]
+                    tracing::debug!(
+                        task_id = %event.task_id,
+                        status = %status,
+                        "Received response from push notification endpoint"
+                    );
+
                     // Check if the request was successful
-                    if response.status().is_success() {
+                    if status.is_success() {
+                        #[cfg(feature = "tracing")]
+                        tracing::info!(
+                            task_id = %event.task_id,
+                            status = %status,
+                            "Push notification HTTP request succeeded"
+                        );
                         return Ok(());
                     } else {
-                        let status = response.status();
                         let body = response.text().await.unwrap_or_default();
+                        #[cfg(feature = "tracing")]
+                        tracing::warn!(
+                            task_id = %event.task_id,
+                            status = %status,
+                            body = %body,
+                            "Push notification HTTP request failed"
+                        );
                         last_error = Some(A2AError::Internal(format!(
                             "Push notification failed with status {}: {}",
                             status, body
@@ -179,6 +221,12 @@ impl PushNotificationSender for HttpPushNotificationSender {
                     }
                 }
                 Err(e) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!(
+                        task_id = %event.task_id,
+                        error = %e,
+                        "Failed to send HTTP request for push notification"
+                    );
                     // Store the error but continue retrying
                     last_error = Some(A2AError::Internal(format!(
                         "Failed to send push notification: {}",
@@ -329,12 +377,45 @@ impl PushNotificationRegistry {
         task_id: &str,
         event: &TaskStatusUpdateEvent,
     ) -> Result<(), A2AError> {
-        let registry = self.registry.lock().await;
+        let config = {
+            let registry = self.registry.lock().await;
+            registry.get(task_id).cloned()
+        };
 
-        if let Some(config) = registry.get(task_id) {
-            self.sender.send_status_update(config, event).await?;
-            Ok(())
+        if let Some(config) = config {
+            #[cfg(feature = "tracing")]
+            tracing::info!(
+                task_id = %task_id,
+                url = %config.url,
+                state = ?event.status.state,
+                "📤 Sending push notification for status update"
+            );
+
+            match self.sender.send_status_update(&config, event).await {
+                Ok(()) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::info!(
+                        task_id = %task_id,
+                        "✅ Push notification sent successfully"
+                    );
+                    Ok(())
+                }
+                Err(e) => {
+                    #[cfg(feature = "tracing")]
+                    tracing::error!(
+                        task_id = %task_id,
+                        error = %e,
+                        "❌ Failed to send push notification"
+                    );
+                    Err(e)
+                }
+            }
         } else {
+            #[cfg(feature = "tracing")]
+            tracing::debug!(
+                task_id = %task_id,
+                "⚠️  No push notification config registered for task"
+            );
             // No push notification configured for this task
             Ok(())
         }

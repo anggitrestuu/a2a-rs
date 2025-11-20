@@ -26,6 +26,10 @@ impl SimpleAgentInfo {
                 url,
                 provider: None,
                 version: "1.0.0".to_string(),
+                protocol_version: "0.3.0".to_string(),
+                preferred_transport: "JSONRPC".to_string(),
+                additional_interfaces: None,
+                icon_url: None,
                 documentation_url: None,
                 capabilities: AgentCapabilities::default(),
                 security_schemes: None,
@@ -33,7 +37,7 @@ impl SimpleAgentInfo {
                 default_input_modes: vec!["text".to_string()],
                 default_output_modes: vec!["text".to_string()],
                 skills: Vec::new(),
-                signature: None,
+                signatures: None,
                 supports_authenticated_extended_card: None,
             },
         }
@@ -78,6 +82,12 @@ impl SimpleAgentInfo {
     /// Enable state transition history capability
     pub fn with_state_transition_history(mut self) -> Self {
         self.card.capabilities.state_transition_history = true;
+        self
+    }
+
+    /// Enable authenticated extended card support (v0.3.0)
+    pub fn with_authenticated_extended_card(mut self) -> Self {
+        self.card.supports_authenticated_extended_card = Some(true);
         self
     }
 
@@ -250,5 +260,20 @@ impl AgentInfoProvider for SimpleAgentInfo {
     // Override the default implementation for better performance
     async fn has_skill(&self, id: &str) -> Result<bool, A2AError> {
         Ok(self.card.skills.iter().any(|skill| skill.id == id))
+    }
+
+    // Override to provide authenticated extended card when configured (v0.3.0)
+    async fn get_authenticated_extended_card(&self) -> Result<AgentCard, A2AError> {
+        if self
+            .card
+            .supports_authenticated_extended_card
+            .unwrap_or(false)
+        {
+            // Return the same card for now
+            // In a real implementation, this might include additional authenticated-only fields
+            Ok(self.card.clone())
+        } else {
+            Err(A2AError::AuthenticatedExtendedCardNotConfigured)
+        }
     }
 }

@@ -14,9 +14,9 @@ use a2a_rs::{
         TaskStatusUpdateEvent,
     },
     port::{
-        streaming_handler::Subscriber, AsyncMessageHandler, AsyncNotificationManager,
-        AsyncStreamingHandler, AsyncTaskManager, MessageHandler, NotificationManager,
-        StreamingHandler, TaskManager,
+        AsyncMessageHandler, AsyncNotificationManager, AsyncStreamingHandler, AsyncTaskManager,
+        MessageHandler, NotificationManager, StreamingHandler, TaskManager,
+        streaming_handler::Subscriber,
     },
 };
 
@@ -226,6 +226,34 @@ impl AsyncTaskManager for TestBusinessHandler {
 
     async fn task_exists<'a>(&self, task_id: &'a str) -> Result<bool, A2AError> {
         self.storage.task_exists(task_id).await
+    }
+
+    async fn list_tasks_v3<'a>(
+        &self,
+        params: &'a a2a_rs::domain::ListTasksParams,
+    ) -> Result<a2a_rs::domain::ListTasksResult, A2AError> {
+        self.storage.list_tasks_v3(params).await
+    }
+
+    async fn get_push_notification_config<'a>(
+        &self,
+        params: &'a a2a_rs::domain::GetTaskPushNotificationConfigParams,
+    ) -> Result<a2a_rs::domain::TaskPushNotificationConfig, A2AError> {
+        self.storage.get_push_notification_config(params).await
+    }
+
+    async fn list_push_notification_configs<'a>(
+        &self,
+        params: &'a a2a_rs::domain::ListTaskPushNotificationConfigParams,
+    ) -> Result<Vec<a2a_rs::domain::TaskPushNotificationConfig>, A2AError> {
+        self.storage.list_push_notification_configs(params).await
+    }
+
+    async fn delete_push_notification_config<'a>(
+        &self,
+        params: &'a a2a_rs::domain::DeleteTaskPushNotificationConfigParams,
+    ) -> Result<(), A2AError> {
+        self.storage.delete_push_notification_config(params).await
     }
 }
 
